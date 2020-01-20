@@ -84,7 +84,8 @@ public strictfp class RobotPlayer {
     }
 
     static void runRefinery() throws GameActionException {
-        // System.out.println("Pollution: " + rc.sensePollution(rc.getLocation()));
+         System.out.println("Pollution: " + rc.sensePollution(rc.getLocation()) + "\nSoup total: " + rc.getTeamSoup());
+
     }
 
     static void runVaporator() throws GameActionException {

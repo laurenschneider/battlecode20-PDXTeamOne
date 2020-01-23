@@ -1,6 +1,8 @@
 package examplefuncsplayer;
 import battlecode.common.*;
 
+import static battlecode.common.GameConstants.MIN_WATER_ELEVATION;
+
 public strictfp class RobotPlayer {
     static RobotController rc;
 
@@ -63,8 +65,20 @@ public strictfp class RobotPlayer {
     }
 
     static void runHQ() throws GameActionException {
-        for (Direction dir : directions)
-            tryBuild(RobotType.MINER, dir);
+        int numMiners = 0;
+        if(numMiners < 5) {
+            for (Direction dir : directions) {
+                if (tryBuild(RobotType.MINER, dir)) {
+                    numMiners++;
+                }
+            }
+        }
+
+        if((rc.senseElevation(rc.getLocation()) - MIN_WATER_ELEVATION) < 50 ) {
+            // HQ is in danger, take action to terraform around HQ
+        }
+
+        // todo: some kind of defense with the net gun
     }
 
     static void runMiner() throws GameActionException {

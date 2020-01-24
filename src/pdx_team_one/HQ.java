@@ -10,7 +10,6 @@ public class HQ extends Robot{
     }
 
     public void takeTurn() throws GameActionException {
-        //todo: this will create a miner for every available direction, up to 8. Is this intended?
         if(numMiners < 5) {
             for (Direction dir : directions) {
                 if (tryBuild(RobotType.MINER, dir)) {

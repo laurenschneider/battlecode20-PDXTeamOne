@@ -10,7 +10,9 @@ public class Miner extends Robot{
         super(r);
         spawn_point = r.getLocation();
     }
-
+    //todo: stop the miners from going for a swim
+    //todo: improve pathing so the miners spread out instead of hugging a wall
+    //todo: use blockchain to communicate important messages
     public void takeTurn() throws GameActionException {
         MapLocation soups[] = rc.senseNearbySoup();
         //if no soups in range

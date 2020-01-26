@@ -4,15 +4,29 @@ import battlecode.common.*;
 public class HQ extends Robot{
 
     private static int numMiners = 0;
+    private static boolean locationSent = false;
 
     HQ(RobotController r) {
         super(r);
     }
 
     public void takeTurn() throws GameActionException {
+        if (!locationSent) {
+           sendLocation();
+           locationSent = true;
+        }
         buildMiners();
         checkElevation();
         defense();
+    }
+
+    private void sendLocation() throws GameActionException {
+        int [] message = new int[7];
+        message[0] = 11111111;      // 8 ones means it's us
+        message[1] = 0;
+        message[2] = rc.getLocation().x;
+        message[3] = rc.getLocation().y;
+        sendMessage(message,50);
     }
 
     private void buildMiners() throws GameActionException {
@@ -31,7 +45,7 @@ public class HQ extends Robot{
             // HQ is in danger, take action to terraform around HQ
             int [] message = new int[7];
             message[0] = 11111111;      // 8 ones means it's us
-            message[1] = 0;             // 0 means HQ is in danger of flooding
+            message[1] = 1;             // 1 means HQ is in danger of flooding
             sendMessage(message,50);
         }
     }

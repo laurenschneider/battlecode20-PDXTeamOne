@@ -2,22 +2,86 @@ package pdx_team_one;
 import battlecode.common.*;
 
 public class Miner extends Robot{
+
+    private MapLocation spawn_point;
+    private static int soup_threshold =  RobotType.MINER.soupLimit/2;
+
     Miner(RobotController r) {
         super(r);
+        spawn_point = r.getLocation();
     }
-
+    //todo: stop the miners from going for a swim
+    //todo: improve pathing so the miners spread out instead of hugging a wall
+    //todo: use blockchain to communicate important messages
     public void takeTurn() throws GameActionException {
-        tryMove(randomDirection());
-        if (tryMove(randomDirection()))
-            System.out.println("I moved!");
-        for (Direction dir : directions)
-            tryBuild(RobotType.FULFILLMENT_CENTER, dir);
-        for (Direction dir : directions)
-            if (tryRefine(dir))
-                System.out.println("I refined soup! " + rc.getTeamSoup());
-        for (Direction dir : directions)
-            if (tryMine(dir))
-                System.out.println("I mined soup! " + rc.getSoupCarrying());
+        MapLocation soups[] = rc.senseNearbySoup();
+        //if no soups in range
+        if (soups.length == 0){
+            //if we're carrying enough soup worth refining
+            if (rc.getSoupCarrying() > soup_threshold){
+                Direction toward;
+                RobotInfo bots[] = rc.senseNearbyRobots();
+                //find a refinery and go refine it
+                for (RobotInfo bot : bots) {
+                    if (bot.type == RobotType.REFINERY || bot.type == RobotType.HQ) {
+                        toward = rc.getLocation().directionTo(bot.location);
+                        if (rc.getLocation().isAdjacentTo(bot.location))
+                            tryRefine(toward);
+                        else {
+                            while(!tryMove(toward))
+                                toward = toward.rotateLeft();
+                        }
+                        return;
+                    }
+                }
+                //head back to HQ if no refinery in range
+                toward = rc.getLocation().directionTo(spawn_point);
+                while(!tryMove(toward))
+                    toward = toward.rotateLeft();
+                return;
+            }
+            //head away from HQ for soup
+            else{
+                Direction dir = rc.getLocation().directionTo(spawn_point).opposite();
+                if (dir == Direction.CENTER)
+                    dir = Direction.SOUTH;
+                while(!tryMove(dir))
+                    dir = dir.rotateLeft();
+                return;
+            }
+        }
+        //if soup in range
+        else {
+            //if we an carry more soup, then go get more soup
+            if (rc.getSoupCarrying() < RobotType.MINER.soupLimit) {
+                for (MapLocation soup : soups) {
+                    if (rc.getLocation().isAdjacentTo(soup)) {
+                        tryMine(rc.getLocation().directionTo(soup));
+                        return;
+                    }
+                }
+                Direction dir = rc.getLocation().directionTo(soups[0]);
+                while (!tryMove(dir))
+                    dir = dir.rotateLeft();
+                return;
+
+            //otherwise either find a refinery or build a refinery
+            }
+            RobotInfo bots[] = rc.senseNearbyRobots();
+            for (RobotInfo bot : bots) {
+                if (bot.type == RobotType.REFINERY || bot.type == RobotType.HQ) {
+                    Direction toward = rc.getLocation().directionTo(bot.location);
+                    if (rc.getLocation().isAdjacentTo(bot.location))
+                        tryRefine(toward);
+                    else
+                        tryMove(toward);
+                    return;
+                }
+            }
+            for (Direction dir : directions)
+                if (tryBuild(RobotType.REFINERY, dir))
+                    return;
+        }
     }
 
     private static boolean tryRefine(Direction dir) throws GameActionException {

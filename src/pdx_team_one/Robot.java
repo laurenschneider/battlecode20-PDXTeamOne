@@ -41,7 +41,7 @@ public abstract class Robot {
         } else return false;
     }
 
-    static void sendMessage(int message[],int cost) throws GameActionException {
+    static void tryMessage(int message[],int cost) throws GameActionException {
         if (rc.canSubmitTransaction(message,  cost))
             rc.submitTransaction(message, cost);
     }

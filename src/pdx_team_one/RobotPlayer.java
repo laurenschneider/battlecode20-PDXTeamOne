@@ -57,6 +57,7 @@ public strictfp class RobotPlayer {
         while (true) {
             try {
                 bot.takeTurn();
+                Clock.yield();
             } catch (Exception e) {
                 System.out.println(rc.getType() + " Exception");
                 e.printStackTrace();

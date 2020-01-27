@@ -5,23 +5,31 @@ public class Miner extends Robot{
 
     private MapLocation spawn_point;
     private static int soup_threshold =  RobotType.MINER.soupLimit/2;
-    private static boolean design_school;
 
     Miner(RobotController r) {
         super(r);
         spawn_point = r.getLocation();
     }
-    //todo: stop the miners from going for a swim
-    //todo: improve pathing so the miners spread out instead of hugging a wall
-    //todo: use blockchain to communicate important messages
     public void takeTurn() throws GameActionException {
+        if (map == null){
+            map = new int[rc.getMapWidth()][rc.getMapHeight()];
+            for (int i = 0; i < rc.getMapWidth(); i++){
+                for (int j = 0; j < rc.getMapHeight(); j++){
+                    map[i][j] = UNEXPLORED;
+                }
+            }
+            parseBlockchain();
+        }
+        else
+            parseBlockchain(rc.getRoundNum()-1);
+
         MapLocation soups[] = rc.senseNearbySoup();
         //if no soups in range
         if (soups.length == 0){
             //if we're carrying enough soup worth refining
             if (rc.getSoupCarrying() > soup_threshold){
                 Direction toward;
-                RobotInfo bots[] = rc.senseNearbyRobots();
+                RobotInfo[] bots = rc.senseNearbyRobots();
                 //find a refinery and go refine it
                 for (RobotInfo bot : bots) {
                     if (bot.type == RobotType.REFINERY || bot.type == RobotType.HQ) {
@@ -58,11 +66,12 @@ public class Miner extends Robot{
                         }
                     }
                 }
-                Direction dir = rc.getLocation().directionTo(spawn_point).opposite();
-                if (dir == Direction.CENTER)
-                    dir = Direction.SOUTH;
-                while(!tryMove(dir))
-                    dir = dir.rotateLeft();
+                if (destination == null || rc.canSenseLocation(destination)) {
+                    destination = null;
+                    pathTo(randomLocation());
+                }
+                else
+                    pathTo(destination);
                 return;
             }
         }

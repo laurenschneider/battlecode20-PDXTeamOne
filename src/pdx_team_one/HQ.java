@@ -27,6 +27,7 @@ public class HQ extends Robot{
         message[2] = rc.getLocation().x;
         message[3] = rc.getLocation().y;
         message[4] = rc.getID();
+        message[5] = rc.senseElevation(rc.getLocation());
         sendMessage(message,50);
     }
 

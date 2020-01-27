@@ -22,15 +22,15 @@ public class HQ extends Robot{
 
     private void sendLocation() throws GameActionException {
         int [] message = new int[7];
-        message[0] = 11111111;      // 8 ones means it's us
-        message[1] = 0;
+        message[0] = TEAM_ID;      // 8 ones means it's us
+        message[1] = HQ_LOCATION;
         message[2] = rc.getLocation().x;
         message[3] = rc.getLocation().y;
+        message[4] = rc.getID();
         sendMessage(message,50);
     }
 
     private void buildMiners() throws GameActionException {
-        //todo: this will create a miner for every available direction, up to 8. Is this intended?
         if(numMiners < 5) {
             for (Direction dir : directions) {
                 if (tryBuild(RobotType.MINER, dir)) {
@@ -44,8 +44,8 @@ public class HQ extends Robot{
         if((rc.senseElevation(rc.getLocation()) - GameConstants.MIN_WATER_ELEVATION) < 50 ) {
             // HQ is in danger, take action to terraform around HQ
             int [] message = new int[7];
-            message[0] = 11111111;      // 8 ones means it's us
-            message[1] = 1;             // 1 means HQ is in danger of flooding
+            message[0] = TEAM_ID;      // 8 ones means it's us
+            message[1] = HQ_FLOOD_DANGER;             // 1 means HQ is in danger of flooding
             sendMessage(message,50);
         }
     }

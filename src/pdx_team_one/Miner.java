@@ -5,6 +5,7 @@ public class Miner extends Robot{
 
     private MapLocation spawn_point;
     private static int soup_threshold =  RobotType.MINER.soupLimit/2;
+    private static boolean design_school;
 
     Miner(RobotController r) {
         super(r);
@@ -42,6 +43,21 @@ public class Miner extends Robot{
             }
             //head away from HQ for soup
             else{
+                //try to build a design school
+                if (!design_school){
+                    for (Direction dir : directions){
+                        if (tryBuild(RobotType.DESIGN_SCHOOL,dir)){
+                            design_school = true;
+                            int[] msg = new int[7];
+                            msg[0] = TEAM_ID;
+                            msg[1] = DESIGN_SCHOOL_BUILT;
+                            msg[2] = rc.adjacentLocation(dir).x;
+                            msg[3] = rc.adjacentLocation(dir).y;
+                            sendMessage(msg,10);
+                            return;
+                        }
+                    }
+                }
                 Direction dir = rc.getLocation().directionTo(spawn_point).opposite();
                 if (dir == Direction.CENTER)
                     dir = Direction.SOUTH;
@@ -67,7 +83,7 @@ public class Miner extends Robot{
 
             //otherwise either find a refinery or build a refinery
             }
-            RobotInfo bots[] = rc.senseNearbyRobots();
+            RobotInfo[] bots = rc.senseNearbyRobots();
             for (RobotInfo bot : bots) {
                 if (bot.type == RobotType.REFINERY || bot.type == RobotType.HQ) {
                     Direction toward = rc.getLocation().directionTo(bot.location);

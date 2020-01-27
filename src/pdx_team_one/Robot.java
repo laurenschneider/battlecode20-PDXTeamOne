@@ -6,6 +6,11 @@ import battlecode.common.*;
 public abstract class Robot {
     static RobotController rc;
 
+    static final int TEAM_ID = 11111111;
+    static final int HQ_LOCATION = 0;
+    static final int HQ_FLOOD_DANGER = 1;
+    static final int DESIGN_SCHOOL_BUILT = 2;
+
     public Robot(RobotController r) {
         rc = r;
     }
@@ -41,8 +46,15 @@ public abstract class Robot {
         } else return false;
     }
 
-    static void tryMessage(int message[],int cost) throws GameActionException {
+    static void sendMessage(int[] message,int cost) throws GameActionException {
         if (rc.canSubmitTransaction(message,  cost))
             rc.submitTransaction(message, cost);
+    }
+
+    static void pathTo(MapLocation ml)throws GameActionException{
+        Direction toward = rc.getLocation().directionTo(ml);
+        while (!tryMove(toward)){
+            toward = toward.rotateLeft();
+        }
     }
 }

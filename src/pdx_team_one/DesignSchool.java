@@ -6,5 +6,9 @@ public class DesignSchool extends Robot{
         super(r);
     }
 
-    public void takeTurn() throws GameActionException{}
+    public void takeTurn() throws GameActionException{
+        for (Direction dir : directions) {
+            tryBuild(RobotType.LANDSCAPER, dir);
+        }
+    }
 }

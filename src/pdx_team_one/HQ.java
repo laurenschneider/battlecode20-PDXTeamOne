@@ -3,8 +3,8 @@ import battlecode.common.*;
 
 public class HQ extends Robot{
 
-    private static int numMiners = 0;
-    private static boolean locationSent = false;
+    static int numMiners = 0;
+    static boolean locationSent = false;
 
     HQ(RobotController r) {
         super(r);
@@ -30,7 +30,7 @@ public class HQ extends Robot{
         sendMessage(message,50);
     }
 
-    private void buildMiners() throws GameActionException {
+    public void buildMiners() throws GameActionException {
         if(numMiners < 5) {
             for (Direction dir : directions) {
                 if (tryBuild(RobotType.MINER, dir)) {
@@ -40,7 +40,7 @@ public class HQ extends Robot{
         }
     }
 
-    private void checkElevation() throws GameActionException {
+    public void checkElevation() throws GameActionException {
         if((rc.senseElevation(rc.getLocation()) - GameConstants.MIN_WATER_ELEVATION) < 50 ) {
             // HQ is in danger, take action to terraform around HQ
             int [] message = new int[7];

@@ -1,27 +1,24 @@
 package pdx_team_one;
 
+import battlecode.common.GameActionException;
+import battlecode.common.RobotController;
 import org.junit.Test;
+
+import static junit.framework.TestCase.assertEquals;
 
 public class HQTest {
 
-    @Test
-    void takeTurnShouldSetLocationOnFirstCall() {
-
-    }
+    RobotController rc;
+    HQ hqtest = new HQ(rc);
 
     @Test
-    void takeTurnShouldSendMessageIfInDanger() {
-
-    }
-
-    @Test
-    void takeTurnShouldBuildMiners() {
-
-    }
-
-    @Test
-    void takeTurnShouldShootWithEnemiesInRange() {
-
+    public void buildMinersShouldBuild5() {
+        try {
+            hqtest.buildMiners();
+        } catch (GameActionException err) {
+            System.out.println("Game action exception");
+        }
+        assertEquals(5, hqtest.numMiners);
     }
 
 }

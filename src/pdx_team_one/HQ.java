@@ -28,7 +28,7 @@ public class HQ extends Robot{
         message[3] = rc.getLocation().y;
         message[4] = rc.getID();
         message[5] = rc.senseElevation(rc.getLocation());
-        sendMessage(message,50);
+        sendMessage(message,DEFCON4);
     }
 
     private void buildMiners() throws GameActionException {
@@ -47,7 +47,7 @@ public class HQ extends Robot{
             int [] message = new int[7];
             message[0] = TEAM_ID;      // 8 ones means it's us
             message[1] = HQ_FLOOD_DANGER;             // 1 means HQ is in danger of flooding
-            sendMessage(message,50);
+            sendMessage(message,DEFCON1);
         }
     }
 

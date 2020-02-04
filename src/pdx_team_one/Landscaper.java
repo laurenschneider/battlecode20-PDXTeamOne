@@ -12,34 +12,16 @@ public class Landscaper extends Robot{
         super(r);
         parseBlockchain();
         map = new int[rc.getMapWidth()][rc.getMapHeight()];
+        updateLocalMap(false);
     }
 
 
     public void takeTurn() throws GameActionException {
-
         parseBlockchain(rc.getRoundNum()-1);
-
-        for (RobotInfo r: rc.senseNearbyRobots()){
-            if (r.type == RobotType.HQ){
-                if (r.team == rc.getTeam()) {
-                    defend();
-                    return;
-                }
-                else{
-                    if (enemyHQ == null)
-                        enemyHQ = r.getLocation();
-                    attack();
-                    return;
-                }
-            }
-        }
-
-        if (enemyHQ == null)
-            pathTo(HQ);
-        else if (rc.getLocation().distanceSquaredTo(HQ) > rc.getLocation().distanceSquaredTo(enemyHQ))
-            pathTo(enemyHQ);
+        if (rc.getLocation().distanceSquaredTo(HQ) < 100)
+            defend();
         else
-            pathTo(HQ);
+            attack();
 
     }
 
@@ -91,30 +73,31 @@ public class Landscaper extends Robot{
     }
 
     private void defend()throws GameActionException{
-        if (target == null){
-            int low = Integer.MAX_VALUE;
+        if (target == null) {
             int dir = 0;
-            for (int i = 0; i < 8; i++){
-                if (!nearHQ[i] && rc.canSenseLocation(HQ.add(directions[i])) && rc.senseElevation(HQ.add(directions[i])) < low){
+            for (int i = 0; i < 8; i++) {
+                if (!nearHQ[i]) {
                     target = HQ.add(directions[i]);
-                    low = rc.senseElevation(HQ.add(directions[i]));
                     dir = i;
+                    break;
                 }
             }
-            if (target == null) {
+
+            int[] msg = new int[7];
+            msg[0] = TEAM_ID;
+            msg[1] = HQ_TARGET_ACQUIRED;
+            msg[2] = dir;
+            System.out.println("Target acquired! " + dir);
+            if (!sendMessage(msg, DEFCON3)) {
                 pathTo(HQ);
+                target = null;
+                System.out.println("jk message didn't send");
                 return;
             }
-            else{
-                int [] msg = new int[7];
-                msg[0] = TEAM_ID;
-                msg[1] = HQ_TARGET_ACQUIRED;
-                msg[2] = dir;
-                sendMessage(msg,DEFCON3);
-                landingSpots.add(target.subtract(target.directionTo(HQ)));
-                landingSpots.add(target.subtract(target.directionTo(HQ).rotateLeft()));
-                landingSpots.add(target.subtract(target.directionTo(HQ).rotateRight()));
-            }
+            landingSpots.add(target.subtract(target.directionTo(HQ)));
+            landingSpots.add(target.subtract(target.directionTo(HQ).rotateLeft()));
+            landingSpots.add(target.subtract(target.directionTo(HQ).rotateRight()));
+
         }
 
 
@@ -132,15 +115,25 @@ public class Landscaper extends Robot{
             return;
         }
 
-        if (current.isAdjacentTo(target) && rc.getDirtCarrying() > 0 && rc.senseNearbyRobots(target,0,rc.getTeam()).length == 0)
-                tryDeposit(current.directionTo(target));
+        if (current.isAdjacentTo(target) && rc.getDirtCarrying() > 0 && rc.senseNearbyRobots(target,0,rc.getTeam()).length == 0) {
+            int low = rc.senseElevation(target);
+            for (int i = 0; i < 8; i ++){
+                MapLocation check = rc.getLocation().add(directions[i]);
+                if (rc.senseElevation(check) < low && rc.getLocation().isAdjacentTo(check) && HQ.isAdjacentTo(check)){
+                    if (rc.senseNearbyRobots(check,0,rc.getTeam()).length == 0) {
+                        target = check;
+                        low = rc.senseElevation(target);
+                    }
+                }
+            }
+            tryDeposit(current.directionTo(target));
+        }
         else if (current.isAdjacentTo(target)) {
             if (tryDig(current.directionTo(target).opposite()))
                 return;
             if (tryDig(current.directionTo(target).opposite().rotateRight()))
                 return;
-            if (tryDig(current.directionTo(target).opposite().rotateLeft()))
-                return;
+            tryDig(current.directionTo(target).opposite().rotateLeft());
         }
 
     }
@@ -154,6 +147,8 @@ public class Landscaper extends Robot{
     }
 
     private boolean tryDig(Direction dir) throws GameActionException{
+        if (rc.isLocationOccupied(rc.getLocation().add(dir)))
+            return false;
         if (rc.isReady() && rc.canDigDirt(dir)) {
             rc.digDirt(dir);
             return true;

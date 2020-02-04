@@ -2,13 +2,17 @@ package pdx_team_one;
 import battlecode.common.*;
 
 public class DesignSchool extends Robot{
+    int numLS = 0;
     DesignSchool(RobotController r) {
         super(r);
     }
 
     public void takeTurn() throws GameActionException{
+        if (numLS >= 8)
+            return;
         for (Direction dir : directions) {
-            tryBuild(RobotType.LANDSCAPER, dir);
+            if (tryBuild(RobotType.LANDSCAPER, dir))
+                numLS++;
         }
     }
 }

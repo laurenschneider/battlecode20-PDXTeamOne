@@ -3,7 +3,7 @@ import battlecode.common.*;
 
 public class HQ extends Robot{
 
-    static int numMiners = 0;
+    int numMiners = 0;
     static boolean locationSent = false;
 
     HQ(RobotController r) {
@@ -30,14 +30,16 @@ public class HQ extends Robot{
         sendMessage(message,50);
     }
 
-    public void buildMiners() throws GameActionException {
+    public int buildMiners() throws GameActionException {
         if(numMiners < 5) {
             for (Direction dir : directions) {
-                if (tryBuild(RobotType.MINER, dir)) {
+                Boolean res = tryBuild(RobotType.MINER, dir);
+                if (res) {
                     numMiners++;
                 }
             }
         }
+        return numMiners;
     }
 
     public void checkElevation() throws GameActionException {

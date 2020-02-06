@@ -39,7 +39,7 @@ public abstract class Robot {
         } else return false;
     }
 
-    static boolean tryBuild(RobotType type, Direction dir) throws GameActionException {
+    boolean tryBuild(RobotType type, Direction dir) throws GameActionException {
         if (rc.isReady() && rc.canBuildRobot(type, dir)) {
             rc.buildRobot(type, dir);
             return true;

@@ -287,7 +287,7 @@ public abstract class Robot {
     //todo: optimize this
     //scans area and updates local map
     //honestly I don't even know if this is necessary
-    static void updateLocalMap(boolean scout) throws GameActionException {
+    void updateLocalMap(boolean scout) throws GameActionException {
         int rcx = rc.getLocation().x;
         int rcy = rc.getLocation().y;
 

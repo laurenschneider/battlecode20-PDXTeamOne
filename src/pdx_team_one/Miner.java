@@ -224,7 +224,7 @@ public class Miner extends Robot{
         } else return false;
     }
 
-    private static boolean tryMine(Direction dir) throws GameActionException {
+    public static boolean tryMine(Direction dir) throws GameActionException {
         if (rc.isReady() && rc.canMineSoup(dir)) {
             rc.mineSoup(dir);
             return true;

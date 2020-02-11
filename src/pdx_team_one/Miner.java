@@ -140,6 +140,23 @@ public class Miner extends Robot{
             }
         }
 
+        if (!fulfillment_center && design_school && rc.getLocation().distanceSquaredTo(HQ) >= 6) {
+            Direction dir = rc.getLocation().directionTo(HQ).opposite();
+            for (int i = 0; i < 8; i++) {
+                if (tryBuild(RobotType.FULFILLMENT_CENTER, dir)) {
+                    fulfillment_center = true;
+                    int[] msg = new int[7];
+                    msg[0] = TEAM_ID;
+                    msg[1] = FULFILLMENT_CENTER_BUILT;
+                    msg[2] = rc.adjacentLocation(dir).x;
+                    msg[3] = rc.adjacentLocation(dir).y;
+                    sendMessage(msg, DEFCON3);
+                    return;
+                }
+                dir = dir.rotateRight();
+            }
+        }
+
         MapLocation[] soups = rc.senseNearbySoup();
         //if soups in range
         if (soups.length > 0) {
@@ -236,6 +253,8 @@ public class Miner extends Robot{
             if (t.getMessage()[0] == TEAM_ID) {
                 if (t.getMessage()[1] == DESIGN_SCHOOL_BUILT)
                     design_school = true;
+                else if (t.getMessage()[1] == FULFILLMENT_CENTER_BUILT)
+                    fulfillment_center = true;
                 else if (t.getMessage()[1] == HQ_LOCATION) {
                     HQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
                     hqID = t.getMessage()[4];

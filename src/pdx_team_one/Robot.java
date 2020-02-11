@@ -15,6 +15,7 @@ public abstract class Robot {
     static final int ENEMY_HQ_FOUND = 3;
     static final int SOUPS_FOUND = 4;
     static final int HQ_TARGET_ACQUIRED = 5;
+    static final int FULFILLMENT_CENTER_BUILT = 6;
 
     static private final int UNEXPLORED = 0;
     static private final int FLOODED = -1000;
@@ -41,6 +42,7 @@ public abstract class Robot {
     static MapLocation prevDestination = null;
     static ArrayList<MapLocation> visited = new ArrayList<>();
     static boolean design_school = false;
+    static boolean fulfillment_center = false;
     static MapLocation enemyHQ = null;
     static int enemyHQID = 0;
 

@@ -6,7 +6,7 @@ import battlecode.common.RobotController;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-import static junit.framework.TestCase.assertEquals;
+import static junit.framework.TestCase.*;
 
 public class MinerTest {
     RobotController rcMock = Mockito.mock(RobotController.class);
@@ -36,8 +36,32 @@ public class MinerTest {
         Mockito.doReturn(false).when(rcMock).canMineSoup(Direction.EAST);
 
         boolean res = testMiner.tryMine(Direction.EAST);
-        assertEquals(false, res);
+        assertFalse(res);
     }
+
+    @Test
+    public void sendMessageSuccess() throws GameActionException {
+        int [] message = new int[1];
+        int cost = 10;
+
+        Mockito.doReturn(100).when(rcMock).getTeamSoup();
+        Mockito.doReturn(true).when(rcMock).canSubmitTransaction(message, cost);
+        Mockito.doNothing().when(rcMock).submitTransaction(message, cost);
+        boolean res = testMiner.sendMessage(message,cost);
+        assertTrue(res);
+    }
+
+    @Test
+    public void sendMessageFail() throws GameActionException {
+        int [] message = new int[1];
+        int cost = 10;
+
+        Mockito.doReturn(100).when(rcMock).getTeamSoup();
+        Mockito.doReturn(false).when(rcMock).canSubmitTransaction(message, cost);
+        boolean res = testMiner.sendMessage(message,cost);
+        assertFalse(res);
+    }
+
 
 
 }

@@ -34,7 +34,6 @@ public class DeliveryDrone extends Robot{
 
     public void runDeliveryDrone() throws GameActionException {
         Team enemy = rc.getTeam().opponent();
-        MapLocation current = rc.getLocation();
 
         if (rc.isCurrentlyHoldingUnit()) {
             tryMove(randomDirection());
@@ -42,13 +41,15 @@ public class DeliveryDrone extends Robot{
             RobotInfo[] robots = rc.senseNearbyRobots();
             if (robots.length == 0) {
                 parseBlockchain();
-                rc.move(rc.getLocation().directionTo(HQ).opposite());
+                rc.move(rc.getLocation().directionTo(HQ));
             }
             for (RobotInfo r : robots) {
                 if (r.team == enemy) {
                     if (rc.getLocation().isAdjacentTo(r.getLocation())) {
                         if (rc.canPickUpUnit(r.getID())) {
                             rc.pickUpUnit(r.getID());
+                            rc.move(randomDirection());
+                            rc.dropUnit(rc.getLocation().directionTo(HQ).opposite());
                             break;
                         }
                     }

@@ -3,8 +3,8 @@ import battlecode.common.*;
 
 public class HQ extends Robot{
 
-    private static int numMiners = 0;
-    private static boolean locationSent = false;
+    int numMiners = 0;
+    static boolean locationSent = false;
 
     HQ(RobotController r) {
         super(r);
@@ -16,41 +16,34 @@ public class HQ extends Robot{
            locationSent = true;
         }
         buildMiners();
-        checkElevation();
         defense();
     }
 
-    private void sendLocation() throws GameActionException {
+    public boolean sendLocation() throws GameActionException {
         int [] message = new int[7];
         message[0] = TEAM_ID;      // 8 ones means it's us
         message[1] = HQ_LOCATION;
         message[2] = rc.getLocation().x;
         message[3] = rc.getLocation().y;
         message[4] = rc.getID();
-        sendMessage(message,50);
+        message[5] = rc.senseElevation(rc.getLocation());
+
+        return sendMessage(message,DEFCON4);
     }
 
-    private void buildMiners() throws GameActionException {
+    public int buildMiners() throws GameActionException {
         if(numMiners < 5) {
             for (Direction dir : directions) {
-                if (tryBuild(RobotType.MINER, dir)) {
+                boolean res = tryBuild(RobotType.MINER, dir);
+                if (res) {
                     numMiners++;
                 }
             }
         }
+        return numMiners;
     }
 
-    private void checkElevation() throws GameActionException {
-        if((rc.senseElevation(rc.getLocation()) - GameConstants.MIN_WATER_ELEVATION) < 50 ) {
-            // HQ is in danger, take action to terraform around HQ
-            int [] message = new int[7];
-            message[0] = TEAM_ID;      // 8 ones means it's us
-            message[1] = HQ_FLOOD_DANGER;             // 1 means HQ is in danger of flooding
-            sendMessage(message,50);
-        }
-    }
-
-    private void defense() throws GameActionException {
+    public boolean defense() throws GameActionException {
         // HQ has built in net gun
         Team opponent = rc.getTeam().opponent();
         RobotInfo[] enemiesInRange = rc.senseNearbyRobots(GameConstants.NET_GUN_SHOOT_RADIUS_SQUARED, opponent);
@@ -62,5 +55,6 @@ public class HQ extends Robot{
                 }
             }
         }
+        return false;
     }
 }

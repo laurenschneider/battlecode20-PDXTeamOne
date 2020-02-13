@@ -41,6 +41,7 @@ public class DeliveryDrone extends Robot{
         } else if (rc.isReady()) {
             RobotInfo[] robots = rc.senseNearbyRobots();
             if (robots.length == 0) {
+                parseBlockchain();
                 rc.move(rc.getLocation().directionTo(HQ).opposite());
             }
             for (RobotInfo r : robots) {

@@ -6,6 +6,7 @@ public class Miner extends Robot{
 
     private static int soup_threshold =  RobotType.MINER.soupLimit/2;
     private static boolean scout = false;
+    private static boolean builder = false;
     private static boolean enemy_design_school = false;
     private static ArrayList<MapLocation> blockSoups = new ArrayList<>();
     private static ArrayList<MapLocation> refineries = new ArrayList<>();
@@ -15,11 +16,13 @@ public class Miner extends Robot{
         super(r);
         if (rc.getRoundNum() == 2)
             scout = true;
-        map = new int[rc.getMapWidth()][rc.getMapHeight()];
+        if (rc.getRoundNum() == 3)
+            builder = true;
+ //       map = new int[rc.getMapWidth()][rc.getMapHeight()];
         for (int i = 1; i < rc.getRoundNum(); i++)
             parseBlockchain(i);
         refineries.add(HQ);
-        updateLocalMap(false);
+        //updateLocalMap(false);
     }
     public void takeTurn() throws GameActionException {
         parseBlockchain(rc.getRoundNum() - 1);
@@ -81,18 +84,22 @@ public class Miner extends Robot{
                 }
             }
             if (count > 0){
+                System.out.println("Soups sent");
                 msg[0] = TEAM_ID;
                 msg[1] = SOUPS_FOUND;
                 sendMessage(msg,DEFCON4);
             }
+            boolean build = true;
+            for (MapLocation r : refineries){
+                if (rc.getLocation().distanceSquaredTo(r) < 100)
+                    build = false;
+            }
+            if (build)
+                buildRefinery();
         }
 
         //walk in a direction until he hits a wall, then tries a different direction
-        if (rc.getCooldownTurns() < 1) {
-            while (!tryMove(scoutPath))
-                scoutPath = scoutPath.rotateLeft();
-        }
-
+        scout();
 
         if (Clock.getBytecodesLeft() < 500)
             return;
@@ -119,11 +126,10 @@ public class Miner extends Robot{
             if (r.type == RobotType.REFINERY && !refineries.contains(r.location))
                 refineries.add(r.location);
         }
-        //around Round 100, miners get in the way of landscapers, so at this point miners need to move on
-        if(rc.getRoundNum() > 100)
-            refineries.remove(HQ);
+        MapLocation[] soups = rc.senseNearbySoup();
+
         //try to build a design school
-        if (!design_school && rc.getLocation().distanceSquaredTo(HQ) >= 4) {
+        if (builder && soups.length == 0 && !design_school && rc.getLocation().distanceSquaredTo(HQ) >= 4) {
             Direction dir = rc.getLocation().directionTo(HQ).opposite();
             for (int i = 0; i < 8; i++) {
                 if (tryBuild(RobotType.DESIGN_SCHOOL, dir)) {
@@ -140,7 +146,7 @@ public class Miner extends Robot{
             }
         }
 
-        if (!fulfillment_center && design_school && rc.getLocation().distanceSquaredTo(HQ) >= 6) {
+        if (builder && !fulfillment_center && design_school && rc.getLocation().distanceSquaredTo(HQ) >= 6) {
             Direction dir = rc.getLocation().directionTo(HQ).opposite();
             for (int i = 0; i < 8; i++) {
                 if (tryBuild(RobotType.FULFILLMENT_CENTER, dir)) {
@@ -157,7 +163,6 @@ public class Miner extends Robot{
             }
         }
 
-        MapLocation[] soups = rc.senseNearbySoup();
         //if soups in range
         if (soups.length > 0) {
             //if we can carry more soup, then go get more soup
@@ -175,24 +180,21 @@ public class Miner extends Robot{
             }
             //otherwise either find a refinery or build a refinery
             int distance = 500000;
-            destination = HQ;
+            MapLocation destination = null;
             for (MapLocation r : refineries) {
                 if (rc.getLocation().distanceSquaredTo(r) < distance) {
                     destination = r;
                     distance = rc.getLocation().distanceSquaredTo(r);
                 }
             }
-            if (rc.getLocation().isAdjacentTo(destination))
+            if (destination == null || distance > 100 && rc.getTeamSoup() >= RobotType.REFINERY.cost)
+                buildRefinery();
+            else if (rc.getLocation().isAdjacentTo(destination))
                 tryRefine(rc.getLocation().directionTo(destination));
             else if (distance < 50)
                 pathTo(destination);
-            else if (rc.getTeamSoup() >= RobotType.REFINERY.cost) {
-                for (Direction dir : directions)
-                    if (tryBuild(RobotType.REFINERY, dir))
-                        break;
-            }
             else
-                pathTo(destination);
+                scout();
         }
         //if no soups in range
         else {
@@ -206,31 +208,23 @@ public class Miner extends Robot{
             if (rc.getSoupCarrying() > soup_threshold) {
                 //find a refinery and go refine it
                 int distance = 50000;
-                MapLocation refine = HQ;
+                MapLocation refine = refineries.get(0);
                 for (MapLocation r : refineries){
                     if (rc.getLocation().distanceSquaredTo(r) < distance){
                         distance = rc.getLocation().distanceSquaredTo(r);
                         refine = r;
                     }
                 }
-                if (rc.getLocation().isAdjacentTo(refine))
+                if (refine == null)
+                    findSoup();
+                else if (rc.getLocation().isAdjacentTo(refine))
                     tryRefine(rc.getLocation().directionTo(refine));
                 else
                     pathTo(refine);
             }
             //go explore for soup
-            else {
-                int distance = 50000;
-                for (MapLocation soup : blockSoups) {
-                    if (rc.getLocation().distanceSquaredTo(soup) < distance) {
-                        distance = rc.getLocation().distanceSquaredTo(soup);
-                        destination = soup;
-                    }
-                }
-                if (destination == null || rc.canSenseLocation(destination))
-                    destination = randomUnexploredLocation();
-                pathTo(destination);
-            }
+            else
+                findSoup();
         }
     }
 
@@ -259,13 +253,55 @@ public class Miner extends Robot{
                     HQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
                     hqID = t.getMessage()[4];
                     hqElevation = t.getMessage()[5];
+                } else if (t.getMessage()[1] == REFINERY_BUILT){
+                    MapLocation r = new MapLocation(t.getMessage()[2],t.getMessage()[3]);
+                    if (!refineries.contains(r))
+                        refineries.add(r);
                 } else if (t.getMessage()[1] == SOUPS_FOUND) {
                     for (int j = 2; j < 7 && t.getMessage()[j] != 0; j++)
                         blockSoups.add(new MapLocation(t.getMessage()[j] / 100, t.getMessage()[j] % 100));
-                } else if (t.getMessage()[0] % 10000 == TEAM_ID) {
-                    updateMap(t.getMessage());
                 }
+            } //else if (t.getMessage()[0] % 10000 == TEAM_ID) {
+              //  updateMap(t.getMessage());
+            //}
+        }
+    }
+
+    private boolean buildRefinery() throws GameActionException {
+        for (Direction dir : directions) {
+            if (tryBuild(RobotType.REFINERY, dir)) {
+                for (RobotInfo r : rc.senseNearbyRobots()) {
+                    if (r.type == RobotType.REFINERY && !refineries.contains(r.location))
+                        refineries.add(r.location);
+                }
+                int[] msg = new int[7];
+                msg[0] = TEAM_ID;
+                msg[1] = REFINERY_BUILT;
+                msg[2] = rc.getLocation().add(dir).x;
+                msg[3] = rc.getLocation().add(dir).y;
+                sendMessage(msg, DEFCON4);
+                return true;
             }
+        }
+        return false;
+    }
+
+    private void findSoup() throws GameActionException{
+        MapLocation s = null;
+        for (MapLocation soup : blockSoups) {
+            if (s == null || rc.getLocation().distanceSquaredTo(soup) < rc.getLocation().distanceSquaredTo(s))
+                s = soup;
+        }
+        if (s == null)
+            scout();
+        else
+            pathTo(s);
+    }
+
+    private void scout() throws GameActionException{
+        if (rc.getCooldownTurns() < 1) {
+            while(!tryMove(scoutPath))
+                scoutPath = randomDirection();
         }
     }
 }

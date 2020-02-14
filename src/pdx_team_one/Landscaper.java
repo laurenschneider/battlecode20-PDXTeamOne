@@ -6,13 +6,15 @@ public class Landscaper extends Robot{
 
     private boolean [] nearHQ = new boolean[8];
     private MapLocation target = null;
-    private ArrayList<MapLocation> landingSpots = new ArrayList<>();
+    private ArrayList<MapLocation> dumpSpots = new ArrayList<>();
 
     Landscaper(RobotController r) throws GameActionException{
         super(r);
         parseBlockchain();
-        map = new int[rc.getMapWidth()][rc.getMapHeight()];
-        updateLocalMap(false);
+//        map = new int[rc.getMapWidth()][rc.getMapHeight()];
+//        updateLocalMap(false);
+        for (Direction dir: directions)
+            dumpSpots.add(HQ.add(dir));
     }
 
 
@@ -87,6 +89,7 @@ public class Landscaper extends Robot{
             msg[0] = TEAM_ID;
             msg[1] = HQ_TARGET_ACQUIRED;
             msg[2] = dir;
+            msg[3] = rc.getID();
             System.out.println("Target acquired! " + dir);
             if (!sendMessage(msg, DEFCON3)) {
                 pathTo(HQ);
@@ -94,46 +97,32 @@ public class Landscaper extends Robot{
                 System.out.println("jk message didn't send");
                 return;
             }
-            landingSpots.add(target.subtract(target.directionTo(HQ)));
-            landingSpots.add(target.subtract(target.directionTo(HQ).rotateLeft()));
-            landingSpots.add(target.subtract(target.directionTo(HQ).rotateRight()));
-
         }
 
 
         MapLocation current = rc.getLocation();
 
-        if (!landingSpots.contains(current)){
-            if (rc.canSenseLocation(landingSpots.get(0)) && !rc.isLocationOccupied(landingSpots.get(0)))
-                pathTo(landingSpots.get(0));
-            else if (rc.canSenseLocation(landingSpots.get(1)) && !rc.isLocationOccupied(landingSpots.get(1)))
-                pathTo(landingSpots.get(1));
-            else if (rc.canSenseLocation(landingSpots.get(2)) && !rc.isLocationOccupied(landingSpots.get(2)))
-                pathTo(landingSpots.get(2));
-            else
-                pathTo(HQ);
-            return;
-        }
-
-        if (current.isAdjacentTo(target) && rc.getDirtCarrying() > 0 && rc.senseNearbyRobots(target,0,rc.getTeam()).length == 0) {
-            int low = rc.senseElevation(target);
-            for (int i = 0; i < 8; i ++){
-                MapLocation check = rc.getLocation().add(directions[i]);
-                if (rc.senseElevation(check) < low && rc.getLocation().isAdjacentTo(check) && HQ.isAdjacentTo(check)){
-                    if (rc.senseNearbyRobots(check,0,rc.getTeam()).length == 0) {
-                        target = check;
-                        low = rc.senseElevation(target);
+        if (current.equals(target) && rc.getDirtCarrying() > 0){
+            //System.out.println("Dumping dirt");
+                MapLocation dump = current.add(current.directionTo(HQ).rotateLeft());
+                for (MapLocation d : dumpSpots) {
+                    if (rc.senseElevation(d) < rc.senseElevation(dump) && current.isAdjacentTo(d)) {
+                        dump = d;
+                        }
                     }
-                }
-            }
-            tryDeposit(current.directionTo(target));
+            tryDeposit(current.directionTo(dump));
         }
-        else if (current.isAdjacentTo(target)) {
-            if (tryDig(current.directionTo(target).opposite()))
+        else if (rc.getLocation().equals(target)) {
+            //System.out.println("Digging dirt");
+            if (tryDig(current.directionTo(HQ).opposite()))
                 return;
-            if (tryDig(current.directionTo(target).opposite().rotateRight()))
+            if (tryDig(current.directionTo(HQ).opposite().rotateRight()))
                 return;
-            tryDig(current.directionTo(target).opposite().rotateLeft());
+            tryDig(current.directionTo(HQ).opposite().rotateLeft());
+        }
+        else {
+            //System.out.println("Trying to get to " + target);
+            pathTo(target);
         }
 
     }

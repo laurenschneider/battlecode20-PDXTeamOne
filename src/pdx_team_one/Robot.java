@@ -1,6 +1,5 @@
 package pdx_team_one;
 import battlecode.common.*;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 
 //Parent class for all other robots
@@ -16,6 +15,7 @@ public abstract class Robot {
     static final int SOUPS_FOUND = 4;
     static final int HQ_TARGET_ACQUIRED = 5;
     static final int FULFILLMENT_CENTER_BUILT = 6;
+    static final int REFINERY_BUILT = 7;
 
     static private final int UNEXPLORED = 0;
     static private final int FLOODED = -1000;
@@ -28,24 +28,21 @@ public abstract class Robot {
     //HQ location
     static final int DEFCON4 = 2;
     //soup locations, design school built, landscaper target acquired
-    static final int DEFCON3 = 5;
+    static final int DEFCON3 = 3;
     //
-    static final int DEFCON2 = 25;
+    static final int DEFCON2 = 4;
     //HQ in trouble/enemy HQ found
-    static final int DEFCON1 = 50;
+    static final int DEFCON1 = 5;
 
-    static int[][] map;
+ //   static int[][] map;
     static int hqElevation;
     static MapLocation HQ = null;
     static int hqID = 0;
-    static MapLocation destination = null;
-    static MapLocation prevDestination = null;
-    static ArrayList<MapLocation> visited = new ArrayList<>();
+    //static MapLocation destination = null;
     static boolean design_school = false;
     static boolean fulfillment_center = false;
     static MapLocation enemyHQ = null;
     static int enemyHQID = 0;
-
 
     //TEAM_ID here is changed here for debugging because I can't figure out how
     //to scrimmage against a different team locally
@@ -118,7 +115,10 @@ public abstract class Robot {
     //works great for short distances, takes too long if there are too many obstacles though
     //must be done in 1 turn; a changing map means calculations can't carry over
     static void pathTo(MapLocation target) throws GameActionException {
-       class Node {
+        if (rc.getCooldownTurns() >= 1)
+            return;
+
+        class Node {
             private int g = 0;
             private int h = 0;
             private int f = 0;
@@ -130,6 +130,8 @@ public abstract class Robot {
                 parent = p;
             }
         }
+
+
         ArrayList<Node> openList = new ArrayList<>();
         ArrayList<MapLocation> closedList = new ArrayList<>();
 
@@ -148,13 +150,14 @@ public abstract class Robot {
             openList.remove(curr);
             closedList.add(curr.location);
 
-            if (curr.location.equals(target) || Clock.getBytecodesLeft() < 500) {
-                tryMove(move);
+            if (curr.location.equals(target) || Clock.getBytecodesLeft() < 1000) {
+                if (rc.canMove(move))
+                    tryMove(move);
                 return;
             }
 
             for (Direction dir : directions) {
-                if (!canTraverse(curr.location, curr.location.add(dir),target))
+                if (!canTraverse(curr.location, curr.location.add(dir), target))
                     continue;
                 if (closedList.contains(curr.location.add(dir)))
                     continue;
@@ -163,45 +166,15 @@ public abstract class Robot {
                 child.h = child.location.distanceSquaredTo(target);
                 child.f = child.g + child.h;
                 int i;
-                for (i = 0; i < openList.size(); i++){
-                    if (child.f < openList.get(i).f){
+                for (i = 0; i < openList.size(); i++) {
+                    if (child.f < openList.get(i).f) {
                         break;
                     }
                 }
-                openList.add(i,child);
+                openList.add(i, child);
             }
         }
     }
-    /*
-    //old naive algorithm
-    static void pathTo(MapLocation ml)throws GameActionException {
-        if (rc.getCooldownTurns() >= 1)
-            return;
-        if (prevDestination == null || !(prevDestination.equals(ml))) {
-            visited.clear();
-            prevDestination = ml;
-        }
-        Direction dir = rc.getLocation().directionTo(ml);
-        visited.add(rc.getLocation());
-        for (int i = 0; i < 8; i++) {
-            if (!(visited.contains(rc.getLocation().add(dir)))) {
-                if (tryMove(dir))
-                    return;
-            }
-            dir = dir.rotateLeft();
-        }
-        visited.clear();
-        dir = rc.getLocation().directionTo(ml);
-        visited.add(rc.getLocation());
-        for (int i = 0; i < 8; i++) {
-            if (!(visited.contains(rc.getLocation().add(dir)))) {
-                if (tryMove(dir))
-                    return;
-            }
-            dir = dir.rotateLeft();
-        }
-    }
-    */
     //returns whether it's possible to move from point a to point b
     static private boolean canTraverse(MapLocation a, MapLocation b, MapLocation target) throws GameActionException {
         if (!rc.onTheMap(b))
@@ -210,10 +183,13 @@ public abstract class Robot {
             return true;
         if (rc.canSenseLocation(b) && rc.isLocationOccupied(b) && !b.equals(target))
             return false;
+        if (rc.getType() == RobotType.DELIVERY_DRONE)
+            return true;
         int diff = rc.senseElevation(a) - rc.senseElevation(b);
         return (diff >= -3 && diff <= 3);
     }
 
+    /*
     //updates local map from blockchain message
     //idk how to optimize this any more than it is
     static void updateMap(int[] updates) {
@@ -301,7 +277,6 @@ public abstract class Robot {
         else
             range = 4;
 
-        System.out.println(-range);
         if (scout) {
             int[] polar = new int[11];
             int[] elevations = new int[11];
@@ -377,7 +352,8 @@ public abstract class Robot {
             }
         }
     }
-
+    */
+    /*
     static MapLocation randomUnexploredLocation(){
         while (true){
             int x = (int)(Math.random() * rc.getMapWidth());
@@ -387,7 +363,8 @@ public abstract class Robot {
             }
         }
     }
-
+    */
+    /*
     static private final int[][] coordinates = {
             {-100,-100},
             {-6, 6},
@@ -560,4 +537,5 @@ public abstract class Robot {
             {5, -6},
             {6, -6}
     };
+    */
 }

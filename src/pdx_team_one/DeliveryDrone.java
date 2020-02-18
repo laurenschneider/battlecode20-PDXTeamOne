@@ -14,22 +14,27 @@ public class DeliveryDrone extends Robot{
         runDeliveryDrone();
     }
 
-    private void parseBlockchain() throws GameActionException {
+    public int parseBlockchain() throws GameActionException {
+        int res = 0;
         for (int i = 1; i < rc.getRoundNum(); i++){
             for (Transaction t : rc.getBlock(i)){
                 if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == HQ_LOCATION){
                     HQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
                     t.getMessage()[4] = hqID;
+                    res = 1;
                 }
                 else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == ENEMY_HQ_FOUND){
                     enemyHQ = new MapLocation(t.getMessage()[2],t.getMessage()[3]);
                     t.getMessage()[4] = enemyHQID;
+                    res = 2;
                 }
                 else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == HQ_TARGET_ACQUIRED){
                     nearHQ[t.getMessage()[2]] = true;
+                    res = 3;
                 }
             }
         }
+        return res;
     }
 
     public void runDeliveryDrone() throws GameActionException {

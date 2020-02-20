@@ -234,7 +234,7 @@ public class Miner extends Robot{
         }
     }
 
-    private static boolean tryRefine(Direction dir) throws GameActionException {
+    static boolean tryRefine(Direction dir) throws GameActionException {
         if (rc.isReady() && rc.canDepositSoup(dir)) {
             rc.depositSoup(dir, rc.getSoupCarrying());
             return true;
@@ -248,24 +248,31 @@ public class Miner extends Robot{
         } else return false;
     }
 
-    private static void parseBlockchain(int round) throws GameActionException {
+    static int parseBlockchain(int round) throws GameActionException {
+        int res = 0;
         for (Transaction t : rc.getBlock(round)) {
             if (t.getMessage()[0] == TEAM_ID) {
-                if (t.getMessage()[1] == DESIGN_SCHOOL_BUILT)
+                if (t.getMessage()[1] == DESIGN_SCHOOL_BUILT) {
                     design_school = true;
-                else if (t.getMessage()[1] == FULFILLMENT_CENTER_BUILT)
+                    res = 1;
+                } else if (t.getMessage()[1] == FULFILLMENT_CENTER_BUILT) {
                     fulfillment_center = true;
-                else if (t.getMessage()[1] == HQ_LOCATION) {
+                    res = 2;
+                } else if (t.getMessage()[1] == HQ_LOCATION) {
                     HQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
                     hqID = t.getMessage()[4];
                     hqElevation = t.getMessage()[5];
+                    res = 3;
                 } else if (t.getMessage()[1] == SOUPS_FOUND) {
                     for (int j = 2; j < 7 && t.getMessage()[j] != 0; j++)
                         blockSoups.add(new MapLocation(t.getMessage()[j] / 100, t.getMessage()[j] % 100));
+                    res = 4;
                 } else if (t.getMessage()[0] % 10000 == TEAM_ID) {
                     updateMap(t.getMessage());
+                    res = 5;
                 }
             }
         }
+        return res;
     }
 }

@@ -5,6 +5,7 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import static junit.framework.TestCase.assertEquals;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 
 public class DeliveryDroneTest {
@@ -87,5 +88,33 @@ public class DeliveryDroneTest {
 
         int res = testDrone.parseBlockchain();
         assertEquals(3, res);
+    }
+
+    @Test
+    public void runDeliveryDroneIsHoldingUnit() throws GameActionException {
+        DeliveryDrone droneSpy = Mockito.spy(testDrone);
+
+        Mockito.doReturn(true).when(rcMock).isCurrentlyHoldingUnit();
+        Mockito.doReturn(Team.A).when(rcMock).getTeam();
+
+        int res = droneSpy.runDeliveryDrone();
+        assertEquals(1, res);
+    }
+
+    @Test
+    public void runDeliveryDroneIsReady() throws GameActionException {
+        DeliveryDrone droneSpy = Mockito.spy(testDrone);
+        RobotInfo rinfoMock= mock(RobotInfo.class);
+        RobotInfo[] arr = new RobotInfo[1];
+        arr[0] = rinfoMock;
+
+        Mockito.doReturn(Team.A).when(rcMock).getTeam();
+        Mockito.doReturn(false).when(rcMock).isCurrentlyHoldingUnit();
+        Mockito.doReturn(true).when(rcMock).isReady();
+        Mockito.doReturn(arr).when(rcMock).senseNearbyRobots();
+
+
+        int res = droneSpy.runDeliveryDrone();
+        assertEquals(2, res);
     }
 }

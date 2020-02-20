@@ -37,11 +37,12 @@ public class DeliveryDrone extends Robot{
         return res;
     }
 
-    public void runDeliveryDrone() throws GameActionException {
+    public int runDeliveryDrone() throws GameActionException {
         Team enemy = rc.getTeam().opponent();
-
+        int res = 0;
         if (rc.isCurrentlyHoldingUnit()) {
             tryMove(randomDirection());
+            res = 1;
         } else if (rc.isReady()) {
             RobotInfo[] robots = rc.senseNearbyRobots();
             if (robots.length == 0) {
@@ -66,6 +67,8 @@ public class DeliveryDrone extends Robot{
                     rc.move(rc.getLocation().directionTo(r.getLocation()));
                 }
             }
+            res = 2;
         }
+        return res;
     }
 }

@@ -1,6 +1,7 @@
 package pdx_team_one;
 
 import battlecode.common.GameActionException;
+import battlecode.common.MapLocation;
 import battlecode.common.RobotController;
 import battlecode.common.RobotType;
 import org.junit.Test;
@@ -17,8 +18,12 @@ public class RobotPlayerTest {
 	RobotPlayer rpTest = new RobotPlayer();
 
 	@Test
-	public void testSanity() {
-		assertEquals(2, 1+1);
+	public void testRunHQ() throws GameActionException {
+
+//		Mockito.doReturn(RobotType.HQ).when(rcMock).getType();
+//		Mockito.doReturn(null).when(rcMock).getLocation();
+//
+//		rpTest.run(rcMock);
 	}
 
 }

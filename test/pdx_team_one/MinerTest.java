@@ -3,6 +3,7 @@ package pdx_team_one;
 import battlecode.common.Direction;
 import battlecode.common.GameActionException;
 import battlecode.common.RobotController;
+import battlecode.common.Transaction;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -62,6 +63,92 @@ public class MinerTest {
         assertFalse(res);
     }
 
+    @Test
+    public void parseBlockchainWrongTeam() throws GameActionException {
+        int cost = 1;
+        int [] message = new int [4];
+        message[0] = 0;
+        int id = 3;
+        Transaction t1 = new Transaction(cost,message,id);
+        Transaction [] t = new Transaction[1];
+        t[0] = t1;
+        Mockito.doReturn(t).when(rcMock).getBlock(0);
 
+        int res = testMiner.parseBlockchain(0);
+        assertEquals(0, res);
+    }
 
+    @Test
+    public void parseBlockchainDesignSchoolBuilt() throws GameActionException {
+        int cost = 1;
+        int [] message = new int [5];
+        message[0] = 2222; message[1] = 2;
+        int id = 3;
+        Transaction t1 = new Transaction(cost,message,id);
+        Transaction [] t = new Transaction[1];
+        t[0] = t1;
+        Mockito.doReturn(t).when(rcMock).getBlock(0);
+        int res = testMiner.parseBlockchain(0);
+        assertEquals(1, res);
+    }
+
+    @Test
+    public void parseBlockchainFCenterBuilt() throws GameActionException {
+        int cost = 1;
+        int [] message = new int [5];
+        message[0] = 2222; message[1] = 6;
+        int id = 3;
+        Transaction t1 = new Transaction(cost,message,id);
+        Transaction [] t = new Transaction[1];
+        t[0] = t1;
+        Mockito.doReturn(t).when(rcMock).getBlock(0);
+        int res = testMiner.parseBlockchain(0);
+        assertEquals(2, res);
+    }
+
+    @Test
+    public void parseBlockchainHQLoc() throws GameActionException {
+        int cost = 1;
+        int [] message = new int [6];
+        message[0] = 2222; message[1] = 0; message[2] = 0;message[3] = 0;message[4] = 0;message[5] = 0;
+        int id = 3;
+        Transaction t1 = new Transaction(cost,message,id);
+        Transaction [] t = new Transaction[1];
+        t[0] = t1;
+        Mockito.doReturn(t).when(rcMock).getBlock(0);
+        int res = testMiner.parseBlockchain(0);
+        assertEquals(3, res);
+    }
+
+    @Test
+    public void parseBlockchainSoupFound() throws GameActionException {
+        int cost = 1;
+        int [] message = new int [7];
+        message[0] = 2222; message[1] = 4; message[2] = 0;message[3] = 0;
+        message[4] = 0;message[5] = 0;message[6] = 0;
+        int id = 3;
+        Transaction t1 = new Transaction(cost,message,id);
+        Transaction [] t = new Transaction[1];
+        t[0] = t1;
+        Mockito.doReturn(t).when(rcMock).getBlock(0);
+        int res = testMiner.parseBlockchain(0);
+        assertEquals(5, res);
+    }
+
+    @Test
+    public void tryRefineNotReady() throws GameActionException {
+        Mockito.doReturn(false).when(rcMock).isReady();
+        boolean res = testMiner.tryRefine(Direction.EAST);
+        assertFalse(res);
+    }
+
+    @Test
+    public void tryRefineIsReady() throws GameActionException {
+        Direction dir = Direction.EAST;
+        Mockito.doReturn(true).when(rcMock).isReady();
+        Mockito.doReturn(true).when(rcMock).canDepositSoup(dir);
+        Mockito.doNothing().when(rcMock).depositSoup(dir,1);
+        boolean res = testMiner.tryRefine(dir);
+        assertTrue(res);
+    }
 }

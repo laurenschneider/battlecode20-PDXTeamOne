@@ -22,23 +22,29 @@ public class DeliveryDrone extends Robot{
         runDeliveryDrone();
     }
 
-    private void parseBlockchain(int i) throws GameActionException {
+    public int parseBlockchain(int i) throws GameActionException {
+        int res = 0;
         for (Transaction t : rc.getBlock(i)) {
             if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == HQ_LOCATION) {
                 HQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
                 t.getMessage()[4] = hqID;
+                res = 1;
             } else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == ENEMY_HQ_FOUND) {
                 enemyHQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
                 t.getMessage()[4] = enemyHQID;
+                res = 2;
             } else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == HQ_TARGET_ACQUIRED) {
                 landscapers.put(t.getMessage()[3], HQ.add(directions[t.getMessage()[2]]));
+                res = 3;
             }
         }
+        return res;
     }
 
-    private void runDeliveryDrone() throws GameActionException {
-        Team enemy = rc.getTeam().opponent();
 
+    public int runDeliveryDrone() throws GameActionException {
+        Team enemy = rc.getTeam().opponent();
+        int res = 0;
         if (rc.isCurrentlyHoldingUnit()) {
            // System.out.println("I am holding a unit!");
             if (holding.team == enemy) {
@@ -79,32 +85,30 @@ public class DeliveryDrone extends Robot{
                             rc.move(randomDirection());
                             rc.dropUnit(rc.getLocation().directionTo(HQ).opposite());
                             break;
-                        }
-                        else
+                        } else
                             pathTo(r.location);
                     }
-                }
-                else if (r.type == RobotType.LANDSCAPER){
-                   // System.out.println("There are landscapers nearby");
-                    if (landscapers.containsKey(r.ID) && !r.location.equals(landscapers.get(r.ID))){
-                       // System.out.println(r.ID + " needs to move to " + landscapers.get(r.ID));
-                        if (rc.getLocation().isAdjacentTo(r.location)){
+                } else if (r.type == RobotType.LANDSCAPER) {
+                    // System.out.println("There are landscapers nearby");
+                    if (landscapers.containsKey(r.ID) && !r.location.equals(landscapers.get(r.ID))) {
+                        // System.out.println(r.ID + " needs to move to " + landscapers.get(r.ID));
+                        if (rc.getLocation().isAdjacentTo(r.location)) {
                             //System.out.println("I'm right next to him!");
                             if (rc.canPickUpUnit(r.getID())) {
                                 //System.out.println("Got him");
                                 rc.pickUpUnit(r.getID());
                                 holding = r;
-                                return;
+                                return 11;
                             }
-                        }
-                        else {
+                        } else {
                             //System.out.println("Moving toward him");
                             pathTo(r.location);
-                            return;
+                            return 12;
                         }
                     }
                 }
             }
+
             if (rc.getLocation().isAdjacentTo(HQ)){
                 //System.out.println("I need to get out of the way");
                 if (rc.canMove(rc.getLocation().directionTo(HQ).opposite()))
@@ -114,6 +118,8 @@ public class DeliveryDrone extends Robot{
                 else if (rc.canMove(rc.getLocation().directionTo(HQ).opposite().rotateRight()))
                     tryMove(rc.getLocation().directionTo(HQ).opposite().rotateRight());
             }
+
         }
+        return res;
     }
 }

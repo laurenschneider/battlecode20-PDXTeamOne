@@ -13,6 +13,9 @@ public class DeliveryDroneTest {
     private RobotController rcMock = mock(RobotController.class);
     DeliveryDrone testDrone = new DeliveryDrone(rcMock);
 
+    public DeliveryDroneTest() throws GameActionException {
+    }
+
     @Test
     public void parseBlockchainWrongTeam() throws GameActionException {
         int cost = 1;
@@ -24,10 +27,9 @@ public class DeliveryDroneTest {
         Transaction [] t = new Transaction[1];
         t[0] = t1;
 
-        Mockito.doReturn(2).when(rcMock).getRoundNum();
         Mockito.doReturn(t).when(rcMock).getBlock(1);
 
-        int res = testDrone.parseBlockchain();
+        int res = testDrone.parseBlockchain(1);
         assertEquals(0, res);
     }
 
@@ -42,11 +44,9 @@ public class DeliveryDroneTest {
         Transaction t1 = new Transaction(cost,message,id);
         Transaction [] t = new Transaction[1];
         t[0] = t1;
-
-        Mockito.doReturn(2).when(rcMock).getRoundNum();
         Mockito.doReturn(t).when(rcMock).getBlock(1);
 
-        int res = testDrone.parseBlockchain();
+        int res = testDrone.parseBlockchain(1);
         assertEquals(res, 1);
     }
 
@@ -64,30 +64,8 @@ public class DeliveryDroneTest {
 
         Mockito.doReturn(2).when(rcMock).getRoundNum();
         Mockito.doReturn(t).when(rcMock).getBlock(1);
-        Mockito.doReturn(t).when(rcMock).getBlock(2);
-
-        int res = testDrone.parseBlockchain();
+        int res = testDrone.parseBlockchain(1);
         assertEquals(2, res);
-    }
-
-    @Test
-    public void parseBlockchainTestReturn3() throws GameActionException {
-
-        int cost = 1;
-        int [] message = new int [5];
-        message[0] = 2222;
-        message[1] = 5; message[2] = 0; message[3] = 0;
-        int id = 3;
-        Transaction t1 = new Transaction(cost,message,id);
-        Transaction [] t = new Transaction[1];
-        t[0] = t1;
-
-        Mockito.doReturn(2).when(rcMock).getRoundNum();
-        Mockito.doReturn(t).when(rcMock).getBlock(1);
-        Mockito.doReturn(t).when(rcMock).getBlock(2);
-
-        int res = testDrone.parseBlockchain();
-        assertEquals(3, res);
     }
 
     @Test

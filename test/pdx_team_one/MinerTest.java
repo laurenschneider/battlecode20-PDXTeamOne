@@ -132,7 +132,7 @@ public class MinerTest {
         t[0] = t1;
         Mockito.doReturn(t).when(rcMock).getBlock(0);
         int res = testMiner.parseBlockchain(0);
-        assertEquals(4, res);
+        assertEquals(5, res);
     }
 
     @Test

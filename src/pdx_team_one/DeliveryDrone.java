@@ -41,6 +41,75 @@ public class DeliveryDrone extends Robot{
         return res;
     }
 
+    int adjacentHQMoves() throws GameActionException {
+        int res = 0;
+        //System.out.println("I need to get out of the way");
+        if (rc.canMove(rc.getLocation().directionTo(HQ).opposite())) {
+            tryMove(rc.getLocation().directionTo(HQ).opposite());
+            res = 1;
+        } else if (rc.canMove(rc.getLocation().directionTo(HQ).opposite().rotateLeft())) {
+            tryMove(rc.getLocation().directionTo(HQ).opposite().rotateLeft());
+            res = 2;
+        } else if (rc.canMove(rc.getLocation().directionTo(HQ).opposite().rotateRight())) {
+            tryMove(rc.getLocation().directionTo(HQ).opposite().rotateRight());
+            res = 3;
+        }
+        return res;
+    }
+
+    int holdingFriend() throws GameActionException {
+        int res = 0;
+        if (rc.getLocation().isAdjacentTo(landscapers.get(holding.ID))) {
+            // System.out.println("Im adjacent to his landing spot!");
+            if (rc.canDropUnit(rc.getLocation().directionTo(landscapers.get(holding.ID)))) {
+                rc.dropUnit(rc.getLocation().directionTo(landscapers.get(holding.ID)));
+                holding = null;
+                //System.out.println("Dropped him off!");
+            }
+            res = 1;
+        }
+        else {
+            //System.out.println("trying to move to " + landscapers.get(holding.ID));
+            pathTo(landscapers.get(holding.ID));
+            res = 2;
+        }
+        return res;
+    }
+
+    boolean nearbyEnemy(RobotInfo r) throws GameActionException {
+        boolean res = false;
+        if (rc.getLocation().isAdjacentTo(r.getLocation())) {
+            if (rc.canPickUpUnit(r.getID())) {
+                rc.pickUpUnit(r.getID());
+                holding = r;
+                rc.move(randomDirection());
+                rc.dropUnit(rc.getLocation().directionTo(HQ).opposite());
+                res = true;
+            } else {
+                pathTo(r.location);
+            }
+        }
+        return res;
+    }
+
+    int nearbyLandscapers(RobotInfo r) throws GameActionException {
+        int res = 0;
+        // System.out.println(r.ID + " needs to move to " + landscapers.get(r.ID));
+        if (rc.getLocation().isAdjacentTo(r.location)) {
+            //System.out.println("I'm right next to him!");
+            if (rc.canPickUpUnit(r.getID())) {
+                //System.out.println("Got him");
+                rc.pickUpUnit(r.getID());
+                holding = r;
+                res = 1;
+            }
+        } else {
+            //System.out.println("Moving toward him");
+            pathTo(r.location);
+            res =2;
+        }
+        return res;
+    }
 
     public int runDeliveryDrone() throws GameActionException {
         Team enemy = rc.getTeam().opponent();
@@ -52,23 +121,10 @@ public class DeliveryDrone extends Robot{
                 tryMove(randomDirection());
             }
             else {
-
                 //System.out.println("It's a friend!");
-                if (rc.getLocation().isAdjacentTo(landscapers.get(holding.ID))) {
-                   // System.out.println("Im adjacent to his landing spot!");
-                    if (rc.canDropUnit(rc.getLocation().directionTo(landscapers.get(holding.ID)))) {
-                        rc.dropUnit(rc.getLocation().directionTo(landscapers.get(holding.ID)));
-                        holding = null;
-                        //System.out.println("Dropped him off!");
-                    }
-                }
-                else {
-                    //System.out.println("trying to move to " + landscapers.get(holding.ID));
-                    pathTo(landscapers.get(holding.ID));
-                }
+                holdingFriend();
             }
         } else if (rc.isReady()) {
-
             //System.out.println("I'm empty handed");
             RobotInfo[] robots = rc.senseNearbyRobots();
             if (robots.length == 0) {
@@ -78,47 +134,19 @@ public class DeliveryDrone extends Robot{
             for (RobotInfo r : robots) {
                 if (r.team == enemy) {
                     //System.out.println("There are enemies near by!");
-                    if (rc.getLocation().isAdjacentTo(r.getLocation())) {
-                        if (rc.canPickUpUnit(r.getID())) {
-                            rc.pickUpUnit(r.getID());
-                            holding = r;
-                            rc.move(randomDirection());
-                            rc.dropUnit(rc.getLocation().directionTo(HQ).opposite());
-                            break;
-                        } else
-                            pathTo(r.location);
-                    }
+                    boolean shouldBreak = nearbyEnemy(r);
+                    if(shouldBreak)
+                        break;
                 } else if (r.type == RobotType.LANDSCAPER) {
                     // System.out.println("There are landscapers nearby");
                     if (landscapers.containsKey(r.ID) && !r.location.equals(landscapers.get(r.ID))) {
-                        // System.out.println(r.ID + " needs to move to " + landscapers.get(r.ID));
-                        if (rc.getLocation().isAdjacentTo(r.location)) {
-                            //System.out.println("I'm right next to him!");
-                            if (rc.canPickUpUnit(r.getID())) {
-                                //System.out.println("Got him");
-                                rc.pickUpUnit(r.getID());
-                                holding = r;
-                                return 11;
-                            }
-                        } else {
-                            //System.out.println("Moving toward him");
-                            pathTo(r.location);
-                            return 12;
-                        }
+                        return nearbyLandscapers(r);
                     }
                 }
             }
-
             if (rc.getLocation().isAdjacentTo(HQ)){
-                //System.out.println("I need to get out of the way");
-                if (rc.canMove(rc.getLocation().directionTo(HQ).opposite()))
-                    tryMove(rc.getLocation().directionTo(HQ).opposite());
-                else if (rc.canMove(rc.getLocation().directionTo(HQ).opposite().rotateLeft()))
-                    tryMove(rc.getLocation().directionTo(HQ).opposite().rotateLeft());
-                else if (rc.canMove(rc.getLocation().directionTo(HQ).opposite().rotateRight()))
-                    tryMove(rc.getLocation().directionTo(HQ).opposite().rotateRight());
+                res = adjacentHQMoves();
             }
-
         }
         return res;
     }

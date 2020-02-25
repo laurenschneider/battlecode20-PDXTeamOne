@@ -2,6 +2,7 @@ package pdx_team_one;
 import battlecode.common.*;
 
 import java.util.HashMap;
+import java.util.Map;
 
 public class DeliveryDrone extends Robot{
 
@@ -15,6 +16,13 @@ public class DeliveryDrone extends Robot{
             parseBlockchain(i);
     }
 
+    public void setHolding(RobotInfo ri) {
+        this.holding = ri;
+    }
+
+    public void addLandscaper(Integer key, MapLocation loc) {
+        this.landscapers.put(key, loc);
+    }
 
     public void takeTurn() throws GameActionException {
         parseBlockchain(rc.getRoundNum()-1);

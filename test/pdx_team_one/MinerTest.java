@@ -5,6 +5,7 @@ import battlecode.common.GameActionException;
 import battlecode.common.RobotController;
 import battlecode.common.Transaction;
 import org.junit.Test;
+import org.mockito.Mock;
 import org.mockito.Mockito;
 
 import static junit.framework.TestCase.*;
@@ -18,6 +19,25 @@ public class MinerTest {
     };
 
     public MinerTest() throws GameActionException {}
+
+    @Test
+    public void takeTurnTestScout() throws GameActionException {
+        testMiner.scout = true;
+        Mockito.doReturn(2).when(rcMock).getRoundNum();
+        Miner minerspy= Mockito.spy(testMiner);
+        Mockito.doReturn(1).when(minerspy).parseBlockchain(1);
+        Mockito.doNothing().when(minerspy).doScoutThings();
+        minerspy.takeTurn();
+    }
+
+    @Test
+    public void takeTurnTestMine() throws GameActionException {
+        Mockito.doReturn(2).when(rcMock).getRoundNum();
+        Miner minerspy= Mockito.spy(testMiner);
+        Mockito.doReturn(1).when(minerspy).parseBlockchain(1);
+        Mockito.doNothing().when(minerspy).doMinerThings();
+        minerspy.takeTurn();
+    }
 
     @Test
     public void tryMineSuccess() throws GameActionException {

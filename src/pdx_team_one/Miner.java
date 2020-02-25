@@ -5,7 +5,7 @@ import java.util.ArrayList;
 public class Miner extends Robot{
 
     private static int soup_threshold =  RobotType.MINER.soupLimit/2;
-    private static boolean scout = false;
+    public static boolean scout = false;
     private static boolean builder = false;
     private static boolean enemy_design_school = false;
     private static ArrayList<MapLocation> blockSoups = new ArrayList<>();
@@ -30,7 +30,7 @@ public class Miner extends Robot{
             doMinerThings();
     }
 
-    private void doScoutThings() throws GameActionException{
+    public void doScoutThings() throws GameActionException{
         //if it knows where enemyHQ use, build a design school to bury it
         if (enemyHQ != null && !enemy_design_school){
             if (buildDesignSchool(rc.getLocation().directionTo(enemyHQ)))
@@ -54,7 +54,7 @@ public class Miner extends Robot{
         }
     }
 
-    private void doMinerThings() throws GameActionException{
+    public void doMinerThings() throws GameActionException{
         for (RobotInfo r : rc.senseNearbyRobots()){
             if (r.type == RobotType.DESIGN_SCHOOL)
                 design_school = true;
@@ -134,7 +134,7 @@ public class Miner extends Robot{
         } else return false;
     }
 
-    static int parseBlockchain(int round) throws GameActionException {
+    public int parseBlockchain(int round) throws GameActionException {
         int res = 0;
         for (Transaction t : rc.getBlock(round)) {
             if (t.getMessage()[0] == TEAM_ID) {

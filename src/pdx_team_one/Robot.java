@@ -114,7 +114,7 @@ public abstract class Robot {
     //attempt #1 at A* pathfinding
     //works great for short distances, takes too long if there are too many obstacles though
     //must be done in 1 turn; a changing map means calculations can't carry over
-    static void pathTo(MapLocation target) throws GameActionException {
+    public void pathTo(MapLocation target) throws GameActionException {
         if (rc.getCooldownTurns() >= 1)
             return;
 

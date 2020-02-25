@@ -8,6 +8,7 @@ apply plugin: 'java'
 
 apply plugin: 'idea'
 apply plugin: 'eclipse'
+apply plugin: 'jacoco'
 
 ext.versions = [
     battlecode: new File(projectDir, "version.txt").text.trim()
@@ -58,6 +59,7 @@ sourceSets {
 
         java.outputDir = file("$buildDir/tests")
         //scala.outputDir = file("$buildDir/tests")
+
     }
 }
 
@@ -112,6 +114,23 @@ idea {
         jdkName = 1.8
         downloadSources = true
         downloadJavadoc = true
+    }
+}
+jacoco {
+    toolVersion = "0.8.2"
+}
+
+jacocoTestReport {
+    reports {
+        xml.enabled false
+        csv.enabled false
+        html.destination file("${buildDir}/jacocoHtml")
+    }
+
+    afterEvaluate {
+        classDirectories = files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: 'pdx_team_one/RobotPlayerTest')
+        })
     }
 }
 

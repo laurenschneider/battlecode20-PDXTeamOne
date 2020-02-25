@@ -1,6 +1,7 @@
 package pdx_team_one;
 import battlecode.common.*;
 import java.util.ArrayList;
+import java.util.Map;
 
 public class Landscaper extends Robot{
 
@@ -10,6 +11,7 @@ public class Landscaper extends Robot{
 
     Landscaper(RobotController r) throws GameActionException{
         super(r);
+        HQ = new MapLocation(0,0);
         parseBlockchain();
 //        map = new int[rc.getMapWidth()][rc.getMapHeight()];
 //        updateLocalMap(false);
@@ -27,25 +29,30 @@ public class Landscaper extends Robot{
 
     }
 
-    private void parseBlockchain() throws GameActionException {
+    public int parseBlockchain() throws GameActionException {
+        int res = 0;
         for (int i = 1; i < rc.getRoundNum(); i++){
             for (Transaction t : rc.getBlock(i)){
                 if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == HQ_LOCATION){
                     HQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
                     t.getMessage()[4] = hqID;
+                    res = 1;
                 }
                 else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == ENEMY_HQ_FOUND){
                     enemyHQ = new MapLocation(t.getMessage()[2],t.getMessage()[3]);
                     t.getMessage()[4] = enemyHQID;
+                    res = 2;
                 }
                 else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == HQ_TARGET_ACQUIRED){
                     nearHQ[t.getMessage()[2]] = true;
+                    res = 3;
                 }
             }
         }
+        return res;
     }
 
-    private void parseBlockchain(int num) throws GameActionException {
+    public void parseBlockchain(int num) throws GameActionException {
         for (Transaction t : rc.getBlock(num)) {
             if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == HQ_LOCATION) {
                 HQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
@@ -60,7 +67,7 @@ public class Landscaper extends Robot{
     }
 
 
-    private void attack()throws GameActionException {
+    public void attack()throws GameActionException {
         MapLocation current = rc.getLocation();
 
         if (current.isAdjacentTo(enemyHQ) && rc.getDirtCarrying() > 0)
@@ -74,7 +81,7 @@ public class Landscaper extends Robot{
         }
     }
 
-    private void defend()throws GameActionException{
+    public void defend()throws GameActionException{
         if (target == null) {
             int dir = 0;
             for (int i = 0; i < 8; i++) {
@@ -127,7 +134,7 @@ public class Landscaper extends Robot{
 
     }
 
-    private boolean tryDeposit(Direction dir) throws GameActionException{
+    public boolean tryDeposit(Direction dir) throws GameActionException{
         if (rc.isReady() && rc.canDepositDirt(dir)) {
             rc.depositDirt(dir);
             return true;
@@ -135,7 +142,7 @@ public class Landscaper extends Robot{
         return false;
     }
 
-    private boolean tryDig(Direction dir) throws GameActionException{
+    public boolean tryDig(Direction dir) throws GameActionException{
         if (rc.isLocationOccupied(rc.getLocation().add(dir)))
             return false;
         if (rc.isReady() && rc.canDigDirt(dir)) {

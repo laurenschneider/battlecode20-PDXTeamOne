@@ -11,8 +11,6 @@ public class Landscaper extends Robot{
     Landscaper(RobotController r) throws GameActionException{
         super(r);
         parseBlockchain();
-//        map = new int[rc.getMapWidth()][rc.getMapHeight()];
-//        updateLocalMap(false);
         for (Direction dir: directions)
             dumpSpots.add(HQ.add(dir));
     }

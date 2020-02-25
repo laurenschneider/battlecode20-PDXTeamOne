@@ -12,7 +12,6 @@ public class DeliveryDrone extends Robot{
     DeliveryDrone(RobotController r) throws GameActionException
     {
         super(r);
-//        map = new int[rc.getMapWidth()][rc.getMapHeight()];
         for (int i = 1; i < rc.getRoundNum(); i++)
             parseBlockchain(i);
     }

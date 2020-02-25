@@ -13,8 +13,6 @@ public class Landscaper extends Robot{
         super(r);
         HQ = new MapLocation(0,0);
         parseBlockchain();
-//        map = new int[rc.getMapWidth()][rc.getMapHeight()];
-//        updateLocalMap(false);
         for (Direction dir: directions)
             dumpSpots.add(HQ.add(dir));
     }

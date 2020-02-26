@@ -129,8 +129,26 @@ jacocoTestReport {
 
     afterEvaluate {
         classDirectories = files(classDirectories.files.collect {
-            fileTree(dir: it, exclude: 'pdx_team_one/RobotPlayerTest')
+            fileTree(dir: it, exclude: [
+                    'battlecode20-PDXTeamOne/src/pdx_team_one/RobotPlayer'
+            ])
         })
+    }
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            element = 'CLASS'
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.1
+            }
+            excludes = [
+                    'battlecode20-PDXTeamOne.src.pdx_team_one.RobotPlayer'
+            ]
+        }
     }
 }
 

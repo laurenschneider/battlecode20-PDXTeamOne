@@ -6,10 +6,10 @@ public class Miner extends Robot{
 
     private static int soup_threshold =  RobotType.MINER.soupLimit/2;
     public static boolean scout = false;
-    private static boolean builder = false;
-    private static boolean enemy_design_school = false;
+    public static boolean builder = false;
+    public static boolean enemy_design_school = false;
     private static ArrayList<MapLocation> blockSoups = new ArrayList<>();
-    private static ArrayList<MapLocation> refineries = new ArrayList<>();
+    public static ArrayList<MapLocation> refineries = new ArrayList<>();
     private static Direction scoutPath = Direction.NORTH;
 
     Miner(RobotController r) throws GameActionException{
@@ -30,15 +30,15 @@ public class Miner extends Robot{
             doMinerThings();
     }
 
-    public void doScoutThings() throws GameActionException{
+    public int doScoutThings() throws GameActionException{
         //if it knows where enemyHQ use, build a design school to bury it
         if (enemyHQ != null && !enemy_design_school){
             if (buildDesignSchool(rc.getLocation().directionTo(enemyHQ)))
-                return;
+                return 1;
         }
         //look for enemy HQ
         else if (enemyHQ == null && findEnemyHQ()) {
-            return;
+            return 2;
         }
 
         //let everyone know where soup is
@@ -47,14 +47,15 @@ public class Miner extends Robot{
         scout();
 
         if (Clock.getBytecodesLeft() < 500)
-            return;
+            return 3;
         //look for enemy HQ again after moving
         if (enemyHQ == null) {
             findEnemyHQ();
         }
+        return 4;
     }
 
-    public void doMinerThings() throws GameActionException{
+    public int doMinerThings() throws GameActionException{
         for (RobotInfo r : rc.senseNearbyRobots()){
             if (r.type == RobotType.DESIGN_SCHOOL)
                 design_school = true;
@@ -73,7 +74,7 @@ public class Miner extends Robot{
                 msg[2] = rc.adjacentLocation(dir).x;
                 msg[3] = rc.adjacentLocation(dir).y;
                 sendMessage(msg, DEFCON3);
-                return;
+                return 1;
             }
         }
 
@@ -88,7 +89,7 @@ public class Miner extends Robot{
                     msg[2] = rc.adjacentLocation(dir).x;
                     msg[3] = rc.adjacentLocation(dir).y;
                     sendMessage(msg, DEFCON3);
-                    return;
+                    return 2;
                 }
                 dir = dir.rotateRight();
             }
@@ -102,6 +103,7 @@ public class Miner extends Robot{
             //otherwise either find a refinery or build a refinery
             else
                 findRefinery();
+            return 3;
         }
         //if no soups in range
         else {
@@ -117,6 +119,7 @@ public class Miner extends Robot{
             //go explore for soup
             else
                 findSoup();
+            return 4;
         }
     }
 
@@ -207,7 +210,10 @@ public class Miner extends Robot{
     private boolean buildDesignSchool(Direction toward)throws GameActionException{
         for (int i = 0; i < 8; i++){
             if (tryBuild(RobotType.DESIGN_SCHOOL,toward)){
-                design_school = true;
+                if (scout)
+                    enemy_design_school = true;
+                else
+                    design_school = true;
                 return true;
             }
             toward = toward.rotateLeft();

@@ -111,6 +111,7 @@ public class MinerTest {
 
     @Test
     public void minerBuildDesignSchool() throws GameActionException{
+        testMiner.vaporators = 1;
         testMiner.builder = true;
         testMiner.design_school = false;
         testMiner.HQ = new MapLocation(50,50);
@@ -125,6 +126,7 @@ public class MinerTest {
 
     @Test
     public void minerBuildFulfillmentCenter() throws GameActionException{
+        testMiner.vaporators = 1;
         testMiner.builder = true;
         testMiner.design_school = true;
         testMiner.fulfillment_center = false;

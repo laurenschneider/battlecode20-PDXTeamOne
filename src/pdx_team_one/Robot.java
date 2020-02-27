@@ -32,7 +32,7 @@ public abstract class Robot {
     static MapLocation HQ = null;
     static int hqID = 0;
     static boolean design_school = false;
-    static boolean fulfillment_center = false;
+    public static boolean fulfillment_center = false;
     static MapLocation enemyHQ = null;
     static int enemyHQID = 0;
 

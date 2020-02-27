@@ -11,6 +11,7 @@ public class Miner extends Robot{
     private static ArrayList<MapLocation> blockSoups = new ArrayList<>();
     public static ArrayList<MapLocation> refineries = new ArrayList<>();
     private static Direction scoutPath = Direction.NORTH;
+    public int vaporators = 0;
 
     Miner(RobotController r) throws GameActionException{
         super(r);
@@ -33,8 +34,10 @@ public class Miner extends Robot{
     public int doScoutThings() throws GameActionException{
         //if it knows where enemyHQ use, build a design school to bury it
         if (enemyHQ != null && !enemy_design_school){
-            if (buildDesignSchool(rc.getLocation().directionTo(enemyHQ)))
+            if (buildDesignSchool(rc.getLocation().directionTo(enemyHQ))) {
+                enemy_design_school = true;
                 return 1;
+            }
         }
         //look for enemy HQ
         else if (enemyHQ == null && findEnemyHQ()) {
@@ -64,8 +67,13 @@ public class Miner extends Robot{
         }
         MapLocation[] soups = rc.senseNearbySoup();
 
+        if (builder && (vaporators == 0 || (design_school && fulfillment_center))){
+            Direction dir = rc.getLocation().directionTo(HQ).opposite();
+            if(buildVaporator(dir))
+                return 5;
+        }
         //try to build a design school
-        if (builder && soups.length == 0 && !design_school && rc.getLocation().distanceSquaredTo(HQ) >= 4) {
+        if (vaporators > 0 && builder && soups.length == 0 && !design_school && rc.getLocation().distanceSquaredTo(HQ) >= 4) {
             Direction dir = rc.getLocation().directionTo(HQ).opposite();
             if (buildDesignSchool(dir)){
                 int[] msg = new int[7];
@@ -78,7 +86,7 @@ public class Miner extends Robot{
             }
         }
 
-        if (builder && !fulfillment_center && design_school && rc.getLocation().distanceSquaredTo(HQ) >= 6) {
+        if (vaporators > 0 && builder && !fulfillment_center && design_school && rc.getLocation().distanceSquaredTo(HQ) >= 6) {
             Direction dir = rc.getLocation().directionTo(HQ).opposite();
             for (int i = 0; i < 8; i++) {
                 if (tryBuild(RobotType.FULFILLMENT_CENTER, dir)) {
@@ -214,6 +222,17 @@ public class Miner extends Robot{
                     enemy_design_school = true;
                 else
                     design_school = true;
+                return true;
+            }
+            toward = toward.rotateLeft();
+        }
+        return false;
+    }
+
+    private boolean buildVaporator(Direction toward)throws GameActionException{
+        for (int i = 0; i < 8; i++){
+            if (tryBuild(RobotType.VAPORATOR,toward)) {
+                vaporators++;
                 return true;
             }
             toward = toward.rotateLeft();

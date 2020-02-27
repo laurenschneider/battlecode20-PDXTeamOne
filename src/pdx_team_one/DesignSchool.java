@@ -8,7 +8,7 @@ public class DesignSchool extends Robot{
     }
 
     public void takeTurn() throws GameActionException{
-        if (numLS >= 8)
+        if (numLS >= 9 && rc.getRoundNum() < 1000)
             return;
         for (Direction dir : directions) {
             if (tryBuild(RobotType.LANDSCAPER, dir))

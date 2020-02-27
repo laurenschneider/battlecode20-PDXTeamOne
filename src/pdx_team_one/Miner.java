@@ -1,6 +1,9 @@
 package pdx_team_one;
 import battlecode.common.*;
+
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Queue;
 
 public class Miner extends Robot{
 
@@ -12,21 +15,38 @@ public class Miner extends Robot{
     public static ArrayList<MapLocation> refineries = new ArrayList<>();
     private static Direction scoutPath = Direction.NORTH;
     public int vaporators = 0;
+    public static Queue<MapLocation> vaporLocations;
 
     Miner(RobotController r) throws GameActionException{
         super(r);
-        if (rc.getRoundNum() == 2)
-            scout = true;
-        if (rc.getRoundNum() == 3)
-            builder = true;
         for (int i = 1; i < rc.getRoundNum(); i++)
             parseBlockchain(i);
+        if (rc.getRoundNum() == 2)
+            scout = true;
+        if (rc.getRoundNum() == 3) {
+            builder = true;
+            vaporLocations = new ArrayDeque<>();
+            vaporLocations.add(HQ.add(Direction.NORTHWEST).add(Direction.WEST));
+            vaporLocations.add(HQ.add(Direction.NORTHWEST).add(Direction.NORTHWEST));
+            vaporLocations.add(HQ.add(Direction.NORTHWEST).add(Direction.NORTH));
+            vaporLocations.add(HQ.add(Direction.NORTHEAST).add(Direction.NORTH));
+            vaporLocations.add(HQ.add(Direction.NORTHEAST).add(Direction.NORTHEAST));
+            vaporLocations.add(HQ.add(Direction.NORTHEAST).add(Direction.EAST));
+            vaporLocations.add(HQ.add(Direction.SOUTHEAST).add(Direction.EAST));
+            vaporLocations.add(HQ.add(Direction.SOUTHEAST).add(Direction.SOUTHEAST));
+            vaporLocations.add(HQ.add(Direction.SOUTHEAST).add(Direction.SOUTH));
+            vaporLocations.add(HQ.add(Direction.SOUTHWEST).add(Direction.SOUTH));
+            vaporLocations.add(HQ.add(Direction.SOUTHWEST).add(Direction.SOUTHWEST));
+            vaporLocations.add(HQ.add(Direction.SOUTHWEST).add(Direction.WEST));
+        }
         refineries.add(HQ);
     }
     public void takeTurn() throws GameActionException {
         parseBlockchain(rc.getRoundNum() - 1);
         if (scout)
             doScoutThings();
+        else if (builder)
+            doBuilderThings();
         else
             doMinerThings();
     }
@@ -58,32 +78,42 @@ public class Miner extends Robot{
         return 4;
     }
 
-    public int doMinerThings() throws GameActionException{
-        for (RobotInfo r : rc.senseNearbyRobots()){
-            if (r.type == RobotType.DESIGN_SCHOOL)
-                design_school = true;
+    public int doBuilderThings() throws GameActionException {
+        for (RobotInfo r : rc.senseNearbyRobots()) {
             if (r.type == RobotType.REFINERY && !refineries.contains(r.location))
                 refineries.add(r.location);
         }
-        MapLocation[] soups = rc.senseNearbySoup();
 
-        if (builder && (vaporators == 0 || (design_school && fulfillment_center))){
-            Direction dir = rc.getLocation().directionTo(HQ).opposite();
-            if(buildVaporator(dir))
-                return 5;
+        if (vaporLocations.isEmpty())
+            rc.disintegrate();
+
+        if (rc.getTeamSoup() >= RobotType.VAPORATOR.cost &&( vaporators == 0 || (design_school && fulfillment_center))) {
+            if (buildVaporator())
+                return 1;
+        }
+
+        MapLocation[] soups = rc.senseNearbySoup();
+        if (soups.length > 0) {
+            //if we can carry more soup, then go get more soup
+            if (rc.getSoupCarrying() < RobotType.MINER.soupLimit)
+                mineSoup(soups);
+                //otherwise either find a refinery or build a refinery
+            else
+                findRefinery();
+            return 2;
         }
         //try to build a design school
-        if (vaporators > 0 && builder && soups.length == 0 && !design_school && rc.getLocation().distanceSquaredTo(HQ) >= 4) {
-            Direction dir = rc.getLocation().directionTo(HQ).opposite();
-            if (buildDesignSchool(dir)){
-                int[] msg = new int[7];
-                msg[0] = TEAM_ID;
-                msg[1] = DESIGN_SCHOOL_BUILT;
-                msg[2] = rc.adjacentLocation(dir).x;
-                msg[3] = rc.adjacentLocation(dir).y;
-                sendMessage(msg, DEFCON3);
-                return 1;
-            }
+        if (vaporators > 0 && !design_school) {
+            if (rc.getLocation().distanceSquaredTo(HQ) >= 9) {
+                Direction dir = rc.getLocation().directionTo(HQ).opposite();
+                if (buildDesignSchool(dir))
+                    return 3;
+            } else if (tryMove(rc.getLocation().directionTo(HQ).opposite()))
+                return 6;
+            else if (tryMove(rc.getLocation().directionTo(HQ).opposite().rotateLeft()))
+                return 6;
+            else if (tryMove(rc.getLocation().directionTo(HQ).opposite().rotateRight()))
+                return 6;
         }
 
         if (vaporators > 0 && builder && !fulfillment_center && design_school && rc.getLocation().distanceSquaredTo(HQ) >= 6) {
@@ -91,18 +121,20 @@ public class Miner extends Robot{
             for (int i = 0; i < 8; i++) {
                 if (tryBuild(RobotType.FULFILLMENT_CENTER, dir)) {
                     fulfillment_center = true;
-                    int[] msg = new int[7];
-                    msg[0] = TEAM_ID;
-                    msg[1] = FULFILLMENT_CENTER_BUILT;
-                    msg[2] = rc.adjacentLocation(dir).x;
-                    msg[3] = rc.adjacentLocation(dir).y;
-                    sendMessage(msg, DEFCON3);
-                    return 2;
+                    return 4;
                 }
                 dir = dir.rotateRight();
             }
         }
+        return 5;
+    }
 
+    public int doMinerThings() throws GameActionException{
+        for (RobotInfo r : rc.senseNearbyRobots()){
+            if (r.type == RobotType.REFINERY && !refineries.contains(r.location))
+                refineries.add(r.location);
+        }
+        MapLocation[] soups = rc.senseNearbySoup();
         //if soups in range
         if (soups.length > 0) {
             //if we can carry more soup, then go get more soup
@@ -149,19 +181,13 @@ public class Miner extends Robot{
         int res = 0;
         for (Transaction t : rc.getBlock(round)) {
             if (t.getMessage()[0] == TEAM_ID) {
-                if (t.getMessage()[1] == DESIGN_SCHOOL_BUILT) {
-                    design_school = true;
-                    res = 1;
-                } else if (t.getMessage()[1] == FULFILLMENT_CENTER_BUILT) {
-                    fulfillment_center = true;
-                    res = 2;
-                } else if (t.getMessage()[1] == HQ_LOCATION) {
+                if (t.getMessage()[1] == HQ_LOCATION) {
                     HQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
                     hqID = t.getMessage()[4];
                     hqElevation = t.getMessage()[5];
                     res = 3;
-                } else if (t.getMessage()[1] == REFINERY_BUILT){
-                    MapLocation r = new MapLocation(t.getMessage()[2],t.getMessage()[3]);
+                } else if (t.getMessage()[1] == REFINERY_BUILT) {
+                    MapLocation r = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
                     if (!refineries.contains(r))
                         refineries.add(r);
                     res = 4;
@@ -170,9 +196,7 @@ public class Miner extends Robot{
                         blockSoups.add(new MapLocation(t.getMessage()[j] / 100, t.getMessage()[j] % 100));
                     res = 5;
                 }
-            } //else if (t.getMessage()[0] % 10000 == TEAM_ID) {
-              //  updateMap(t.getMessage());
-            //}
+            }
         }
         return res;
     }
@@ -229,14 +253,22 @@ public class Miner extends Robot{
         return false;
     }
 
-    private boolean buildVaporator(Direction toward)throws GameActionException{
-        for (int i = 0; i < 8; i++){
-            if (tryBuild(RobotType.VAPORATOR,toward)) {
+    private boolean buildVaporator()throws GameActionException {
+        System.out.println("gonna try to build at " + vaporLocations.peek());
+        if (rc.getLocation().equals(vaporLocations.peek())){
+            tryMove(rc.getLocation().directionTo(HQ).opposite());
+            tryMove(rc.getLocation().directionTo(HQ).opposite().rotateLeft());
+            tryMove(rc.getLocation().directionTo(HQ).opposite().rotateRight());
+        }
+        else if (rc.getLocation().isAdjacentTo(vaporLocations.peek())) {
+            if (tryBuild(RobotType.VAPORATOR, rc.getLocation().directionTo(vaporLocations.peek()))) {
                 vaporators++;
+                vaporLocations.remove();
                 return true;
             }
-            toward = toward.rotateLeft();
         }
+        else
+            pathTo(vaporLocations.peek());
         return false;
     }
 

@@ -155,6 +155,22 @@ public class DeliveryDrone extends Robot{
                 res = adjacentHQMoves();
             }
         }
+        if (rc.getLocation().distanceSquaredTo(HQ) <= 25) {
+            if (tryMove(rc.getLocation().directionTo(HQ).opposite()))
+                return res;
+            else if (tryMove(rc.getLocation().directionTo(HQ).opposite().rotateRight()))
+                return res;
+            else if (tryMove(rc.getLocation().directionTo(HQ).opposite().rotateLeft()))
+                return res;
+            else if (tryMove(rc.getLocation().directionTo(HQ).opposite().rotateRight().rotateRight()))
+                return res;
+            else if (tryMove(rc.getLocation().directionTo(HQ).opposite().rotateLeft().rotateLeft()))
+                return res;
+            else if (tryMove(rc.getLocation().directionTo(HQ).opposite().rotateRight().rotateRight().rotateRight()))
+                return res;
+            else
+                tryMove(rc.getLocation().directionTo(HQ).opposite().rotateLeft().rotateLeft().rotateLeft());
+        }
         return res;
     }
 }

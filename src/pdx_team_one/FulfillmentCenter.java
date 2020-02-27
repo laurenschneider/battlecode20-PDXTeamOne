@@ -3,12 +3,16 @@ import battlecode.common.*;
 
 public class FulfillmentCenter extends Robot{
 
+    int num = 0;
     FulfillmentCenter(RobotController r) {
         super(r);
     }
 
     public void takeTurn() throws GameActionException {
-        for (Direction dir : directions)
-            tryBuild(RobotType.DELIVERY_DRONE, dir);
+        if (num < 10) {
+            for (Direction dir : directions)
+                if (tryBuild(RobotType.DELIVERY_DRONE, dir))
+                    num++;
+        }
     }
 }

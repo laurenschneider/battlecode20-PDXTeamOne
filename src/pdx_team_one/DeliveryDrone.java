@@ -41,7 +41,7 @@ public class DeliveryDrone extends Robot{
                 t.getMessage()[4] = enemyHQID;
                 res = 2;
             } else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == HQ_TARGET_ACQUIRED) {
-                landscapers.put(t.getMessage()[3], HQ.add(directions[t.getMessage()[2]]));
+                landscapers.put(t.getMessage()[3], HQ.add(directions[t.getMessage()[2]]).add(directions[t.getMessage()[2]]).add(directions[t.getMessage()[2]]));
                 res = 3;
             }
         }

@@ -14,8 +14,8 @@ public class Miner extends Robot{
     private static ArrayList<MapLocation> blockSoups = new ArrayList<>();
     public static ArrayList<MapLocation> refineries = new ArrayList<>();
     private static Direction scoutPath = Direction.NORTH;
-    public int vaporators = 0;
-    public static Queue<MapLocation> vaporLocations;
+    public static Queue<MapLocation> vaporators;
+    public static Queue<MapLocation> netGuns;
 
     Miner(RobotController r) throws GameActionException{
         super(r);
@@ -25,19 +25,16 @@ public class Miner extends Robot{
             scout = true;
         if (rc.getRoundNum() == 3) {
             builder = true;
-            vaporLocations = new ArrayDeque<>();
-            vaporLocations.add(HQ.add(Direction.NORTHWEST).add(Direction.WEST));
-            vaporLocations.add(HQ.add(Direction.NORTHWEST).add(Direction.NORTHWEST));
-            vaporLocations.add(HQ.add(Direction.NORTHWEST).add(Direction.NORTH));
-            vaporLocations.add(HQ.add(Direction.NORTHEAST).add(Direction.NORTH));
-            vaporLocations.add(HQ.add(Direction.NORTHEAST).add(Direction.NORTHEAST));
-            vaporLocations.add(HQ.add(Direction.NORTHEAST).add(Direction.EAST));
-            vaporLocations.add(HQ.add(Direction.SOUTHEAST).add(Direction.EAST));
-            vaporLocations.add(HQ.add(Direction.SOUTHEAST).add(Direction.SOUTHEAST));
-            vaporLocations.add(HQ.add(Direction.SOUTHEAST).add(Direction.SOUTH));
-            vaporLocations.add(HQ.add(Direction.SOUTHWEST).add(Direction.SOUTH));
-            vaporLocations.add(HQ.add(Direction.SOUTHWEST).add(Direction.SOUTHWEST));
-            vaporLocations.add(HQ.add(Direction.SOUTHWEST).add(Direction.WEST));
+            vaporators = new ArrayDeque<>();
+            vaporators.add(HQ.add(Direction.EAST).add(Direction.EAST));
+            vaporators.add(HQ.add(Direction.NORTH).add(Direction.NORTH));
+            vaporators.add(HQ.add(Direction.WEST).add(Direction.WEST));
+            vaporators.add(HQ.add(Direction.SOUTH).add(Direction.SOUTH));
+            netGuns = new ArrayDeque<>();
+            netGuns.add(HQ.add(Direction.NORTHWEST).add(Direction.NORTHWEST));
+            netGuns.add(HQ.add(Direction.NORTHEAST).add(Direction.NORTHEAST));
+            netGuns.add(HQ.add(Direction.SOUTHWEST).add(Direction.SOUTHWEST));
+            netGuns.add(HQ.add(Direction.SOUTHEAST).add(Direction.SOUTHEAST));
         }
         refineries.add(HQ);
     }
@@ -52,7 +49,7 @@ public class Miner extends Robot{
     }
 
     public int doScoutThings() throws GameActionException{
-        //if it knows where enemyHQ use, build a design school to bury it
+        //if it knows where enemyHQ is, build a design school to bury it
         if (enemyHQ != null && !enemy_design_school){
             if (buildDesignSchool(rc.getLocation().directionTo(enemyHQ))) {
                 enemy_design_school = true;
@@ -79,19 +76,6 @@ public class Miner extends Robot{
     }
 
     public int doBuilderThings() throws GameActionException {
-        for (RobotInfo r : rc.senseNearbyRobots()) {
-            if (r.type == RobotType.REFINERY && !refineries.contains(r.location))
-                refineries.add(r.location);
-        }
-
-        if (vaporLocations.isEmpty())
-            rc.disintegrate();
-
-        if (rc.getTeamSoup() >= RobotType.VAPORATOR.cost &&( vaporators == 0 || (design_school && fulfillment_center))) {
-            if (buildVaporator())
-                return 1;
-        }
-
         MapLocation[] soups = rc.senseNearbySoup();
         if (soups.length > 0) {
             //if we can carry more soup, then go get more soup
@@ -102,30 +86,23 @@ public class Miner extends Robot{
                 findRefinery();
             return 2;
         }
-        //try to build a design school
-        if (vaporators > 0 && !design_school) {
-            if (rc.getLocation().distanceSquaredTo(HQ) >= 9) {
-                Direction dir = rc.getLocation().directionTo(HQ).opposite();
-                if (buildDesignSchool(dir))
-                    return 3;
-            } else if (tryMove(rc.getLocation().directionTo(HQ).opposite()))
-                return 6;
-            else if (tryMove(rc.getLocation().directionTo(HQ).opposite().rotateLeft()))
-                return 6;
-            else if (tryMove(rc.getLocation().directionTo(HQ).opposite().rotateRight()))
+        else if (rc.getSoupCarrying() > 0){
+            findRefinery();
+            return 8;
+        }
+        //let's build shit
+        if (!design_school) {
+            if (buildDesignSchool(Direction.CENTER))
                 return 6;
         }
-
-        if (vaporators > 0 && builder && !fulfillment_center && design_school && rc.getLocation().distanceSquaredTo(HQ) >= 6) {
-            Direction dir = rc.getLocation().directionTo(HQ).opposite();
-            for (int i = 0; i < 8; i++) {
-                if (tryBuild(RobotType.FULFILLMENT_CENTER, dir)) {
-                    fulfillment_center = true;
-                    return 4;
-                }
-                dir = dir.rotateRight();
-            }
+        else if (!fulfillment_center) {
+            if (buildFulfillmentCenter())
+                return 4;
         }
+        else if (buildVaporator())
+            return 1;
+        else if (buildNetGun())
+            return 7;
         return 5;
     }
 
@@ -240,35 +217,103 @@ public class Miner extends Robot{
     }
 
     private boolean buildDesignSchool(Direction toward)throws GameActionException{
-        for (int i = 0; i < 8; i++){
-            if (tryBuild(RobotType.DESIGN_SCHOOL,toward)){
-                if (scout)
+        if (scout) {
+            for (int i = 0; i < 8; i++) {
+                if (tryBuild(RobotType.DESIGN_SCHOOL, toward)) {
                     enemy_design_school = true;
-                else
-                    design_school = true;
-                return true;
+                    return true;
+                }
+                toward = toward.rotateLeft();
             }
-            toward = toward.rotateLeft();
+        }
+        else{
+            MapLocation target;
+            if (rc.getLocation().distanceSquaredTo(HQ.add(Direction.NORTHWEST)) < rc.getLocation().distanceSquaredTo(HQ.add(Direction.SOUTHEAST)))
+                target = HQ.add(Direction.NORTHWEST);
+            else
+                target = HQ.add(Direction.SOUTHEAST);
+            if (rc.getLocation().equals(target)){
+                for (Direction dir: directions)
+                    tryMove(dir);
+            }
+            if (rc.getLocation().isAdjacentTo(target)) {
+                if (tryBuild(RobotType.DESIGN_SCHOOL, rc.getLocation().directionTo(target))) {
+                    design_school = true;
+                    return true;
+                }
+            }
+            else
+                pathTo(target);
+            return false;
+
         }
         return false;
     }
 
-    private boolean buildVaporator()throws GameActionException {
-        System.out.println("gonna try to build at " + vaporLocations.peek());
-        if (rc.getLocation().equals(vaporLocations.peek())){
-            tryMove(rc.getLocation().directionTo(HQ).opposite());
-            tryMove(rc.getLocation().directionTo(HQ).opposite().rotateLeft());
-            tryMove(rc.getLocation().directionTo(HQ).opposite().rotateRight());
+    private boolean buildFulfillmentCenter()throws GameActionException{
+        MapLocation target;
+        if (rc.getLocation().distanceSquaredTo(HQ.add(Direction.NORTHEAST)) < rc.getLocation().distanceSquaredTo(HQ.add(Direction.SOUTHWEST)))
+            target = HQ.add(Direction.NORTHEAST);
+        else
+            target = HQ.add(Direction.SOUTHWEST);
+        if (rc.getLocation().equals(target)){
+            for (Direction dir: directions)
+                tryMove(dir);
         }
-        else if (rc.getLocation().isAdjacentTo(vaporLocations.peek())) {
-            if (tryBuild(RobotType.VAPORATOR, rc.getLocation().directionTo(vaporLocations.peek()))) {
-                vaporators++;
-                vaporLocations.remove();
+        else if (rc.getLocation().isAdjacentTo(target)) {
+            if (tryBuild(RobotType.FULFILLMENT_CENTER, rc.getLocation().directionTo(target))) {
+                fulfillment_center = true;
                 return true;
             }
         }
         else
-            pathTo(vaporLocations.peek());
+            pathTo(target);
+        return false;
+    }
+
+    private boolean buildNetGun()throws GameActionException {
+        if (netGuns.isEmpty())
+            return false;
+        MapLocation target = netGuns.peek();
+        for (MapLocation ml: netGuns){
+            if (rc.getLocation().distanceSquaredTo(ml) < rc.getLocation().distanceSquaredTo(target))
+                target = ml;
+        }
+        if (rc.getLocation().equals(target)){
+            for (Direction dir : directions)
+                tryMove(dir);
+        }
+        else if (rc.getLocation().isAdjacentTo(target)) {
+            if (tryBuild(RobotType.NET_GUN, rc.getLocation().directionTo(target))){
+                netGuns.remove(target);
+                return true;
+            }
+        }
+        else
+            pathTo(target);
+        return false;
+    }
+
+    private boolean buildVaporator()throws GameActionException {
+        if (vaporators.isEmpty())
+            return false;
+        MapLocation target = vaporators.peek();
+        for (MapLocation ml: vaporators){
+            if (rc.getLocation().distanceSquaredTo(ml) < rc.getLocation().distanceSquaredTo(target))
+                target = ml;
+        }
+        if (rc.getLocation().equals(target)){
+            for (Direction dir : directions)
+                tryMove(dir);
+        }
+        else if (rc.getLocation().isAdjacentTo(target)) {
+            if (tryBuild(RobotType.VAPORATOR, rc.getLocation().directionTo(target))){
+                vaporators.remove(target);
+                return true;
+            }
+        }
+        else
+            pathTo(target);
         return false;
     }
 

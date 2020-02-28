@@ -32,7 +32,7 @@ public class HQ extends Robot{
     }
 
     public int buildMiners() throws GameActionException {
-        if(numMiners < 5) {
+        if(numMiners < 6) {
             for (Direction dir : directions) {
                 boolean res = tryBuild(RobotType.MINER, dir);
                 if (res) {

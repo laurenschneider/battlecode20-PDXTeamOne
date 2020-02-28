@@ -109,14 +109,13 @@ public class MinerTest {
     }*/
 
 
-
+/*
     @Test
     public void builderDesignSchool() throws GameActionException{
-        testMiner.vaporators = 1;
         testMiner.builder = true;
         testMiner.design_school = false;
         testMiner.HQ = new MapLocation(50,50);
-        testMiner.vaporLocations = new ArrayDeque<>();
+        testMiner.vaporators = new ArrayDeque<>();
         Mockito.doReturn(new MapLocation(1, 1)).when(rcMock).getLocation();
         Mockito.doReturn(new RobotInfo[0]).when(rcMock).senseNearbyRobots();
         Mockito.doReturn(new MapLocation[0]).when(rcMock).senseNearbySoup();
@@ -128,11 +127,10 @@ public class MinerTest {
 
     @Test
     public void builderFulfillmentCenter() throws GameActionException{
-        testMiner.vaporators = 1;
         testMiner.builder = true;
         testMiner.design_school = true;
         testMiner.fulfillment_center = false;
-        testMiner.vaporLocations = new ArrayDeque<>();
+        testMiner.vaporators = new ArrayDeque<>();
         RobotInfo[] r = new RobotInfo[2];
         testMiner.HQ = new MapLocation(50,50);
         Mockito.doReturn(new MapLocation(4, 4)).when(rcMock).getLocation();
@@ -144,7 +142,7 @@ public class MinerTest {
         Mockito.doReturn(true).when(rcMock).isReady();
         Mockito.doReturn(new MapLocation(4,4)).when(rcMock).adjacentLocation(Direction.SOUTHWEST);
         assertEquals(4,testMiner.doBuilderThings());
-    }
+    }*/
 
     @Test
     public void minerSoupsUnderLimit() throws GameActionException{

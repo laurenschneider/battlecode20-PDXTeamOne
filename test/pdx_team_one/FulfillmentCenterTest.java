@@ -14,7 +14,7 @@ public class FulfillmentCenterTest {
 
     private RobotController rcMock = mock(RobotController.class);
     FulfillmentCenter testCenter = new FulfillmentCenter(rcMock);
-
+/*
     @Test
     public void takeTurnTest() throws GameActionException {
         FulfillmentCenter centerSpy = Mockito.spy(testCenter);
@@ -24,4 +24,5 @@ public class FulfillmentCenterTest {
 
         // note this test is doing nothing
     }
+    */
 }

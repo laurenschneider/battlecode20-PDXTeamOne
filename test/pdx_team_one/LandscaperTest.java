@@ -77,7 +77,7 @@ public class LandscaperTest {
         int res = testLandscaper.parseBlockchain();
         assertEquals(res, 2);
     }
-
+/*
     @Test
     public void testParseBlockChainTarget() throws GameActionException {
         int cost = 1;
@@ -95,6 +95,7 @@ public class LandscaperTest {
         int res = testLandscaper.parseBlockchain();
         assertEquals(res, 3);
     }
+    */
 
     @Test
     public void testAttackWithDirt() throws GameActionException {

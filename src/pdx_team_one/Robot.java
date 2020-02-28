@@ -9,11 +9,10 @@ public abstract class Robot {
 
     static int TEAM_ID = 1111; // must be 4 digits for map transmission to work
     static final int HQ_LOCATION = 0;
-    static final int DESIGN_SCHOOL_BUILT = 2;
+    static final int ENEMY_NG_FOUND = 2;
     static final int ENEMY_HQ_FOUND = 3;
     static final int SOUPS_FOUND = 4;
     static final int HQ_TARGET_ACQUIRED = 5;
-    static final int FULFILLMENT_CENTER_BUILT = 6;
     static final int REFINERY_BUILT = 7;
 
     //message importance
@@ -34,6 +33,7 @@ public abstract class Robot {
     static boolean design_school = false;
     public static boolean fulfillment_center = false;
     static MapLocation enemyHQ = null;
+    static MapLocation enemyNG = null;
     static int enemyHQID = 0;
 
     //TEAM_ID here is changed here for debugging because I can't figure out how
@@ -79,7 +79,9 @@ public abstract class Robot {
     }
 
     static boolean tryMove(Direction dir) throws GameActionException {
-        if (rc.isReady() && rc.canMove(dir) && !rc.senseFlooding(rc.adjacentLocation(dir))) {
+        if (rc.isReady() && rc.canMove(dir)) {
+            if (rc.senseFlooding(rc.adjacentLocation(dir)) && rc.getType() != RobotType.DELIVERY_DRONE)
+                return false;
             rc.move(dir);
             return true;
         } else return false;

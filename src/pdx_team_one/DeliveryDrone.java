@@ -2,18 +2,23 @@ package pdx_team_one;
 import battlecode.common.*;
 
 import java.util.HashMap;
-import java.util.Map;
 
 public class DeliveryDrone extends Robot{
 
     private HashMap<Integer, MapLocation> landscapers = new HashMap<>();
     private RobotInfo holding;
+    private static Direction waterPath = Direction.NORTH;
 
     DeliveryDrone(RobotController r) throws GameActionException
     {
         super(r);
         for (int i = 1; i < rc.getRoundNum(); i++)
             parseBlockchain(i);
+    }
+
+    public void takeTurn() throws GameActionException {
+        parseBlockchain(rc.getRoundNum()-1);
+        runDeliveryDrone();
     }
 
     public void setHolding(RobotInfo ri) {
@@ -24,49 +29,36 @@ public class DeliveryDrone extends Robot{
         this.landscapers.put(key, loc);
     }
 
-    public void takeTurn() throws GameActionException {
-        parseBlockchain(rc.getRoundNum()-1);
-        runDeliveryDrone();
-    }
 
     public int parseBlockchain(int i) throws GameActionException {
         int res = 0;
         for (Transaction t : rc.getBlock(i)) {
             if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == HQ_LOCATION) {
                 HQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
-                t.getMessage()[4] = hqID;
+                hqID = t.getMessage()[4];
                 res = 1;
             } else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == ENEMY_HQ_FOUND) {
                 enemyHQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
-                t.getMessage()[4] = enemyHQID;
+                enemyHQID = t.getMessage()[4];
                 res = 2;
+            } else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == ENEMY_NG_FOUND) {
+                enemyNG = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
             } else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == HQ_TARGET_ACQUIRED) {
-                landscapers.put(t.getMessage()[3], HQ.add(directions[t.getMessage()[2]]).add(directions[t.getMessage()[2]]).add(directions[t.getMessage()[2]]));
+                landscapers.put(t.getMessage()[4], new MapLocation(t.getMessage()[2],t.getMessage()[3]));
                 res = 3;
             }
         }
         return res;
     }
 
-    int adjacentHQMoves() throws GameActionException {
-        int res = 0;
-        //System.out.println("I need to get out of the way");
-        if (rc.canMove(rc.getLocation().directionTo(HQ).opposite())) {
-            tryMove(rc.getLocation().directionTo(HQ).opposite());
-            res = 1;
-        } else if (rc.canMove(rc.getLocation().directionTo(HQ).opposite().rotateLeft())) {
-            tryMove(rc.getLocation().directionTo(HQ).opposite().rotateLeft());
-            res = 2;
-        } else if (rc.canMove(rc.getLocation().directionTo(HQ).opposite().rotateRight())) {
-            tryMove(rc.getLocation().directionTo(HQ).opposite().rotateRight());
-            res = 3;
-        }
-        return res;
-    }
 
     int holdingFriend() throws GameActionException {
         int res = 0;
-        if (rc.getLocation().isAdjacentTo(landscapers.get(holding.ID))) {
+        if (rc.getLocation().equals(landscapers.get(holding.ID))){
+            for (Direction dir : directions)
+                tryMove(dir);
+        }
+        else if (rc.getLocation().isAdjacentTo(landscapers.get(holding.ID))) {
             // System.out.println("Im adjacent to his landing spot!");
             if (rc.canDropUnit(rc.getLocation().directionTo(landscapers.get(holding.ID)))) {
                 rc.dropUnit(rc.getLocation().directionTo(landscapers.get(holding.ID)));
@@ -89,8 +81,6 @@ public class DeliveryDrone extends Robot{
             if (rc.canPickUpUnit(r.getID())) {
                 rc.pickUpUnit(r.getID());
                 holding = r;
-                rc.move(randomDirection());
-                rc.dropUnit(rc.getLocation().directionTo(HQ).opposite());
                 res = true;
             } else {
                 pathTo(r.location);
@@ -120,12 +110,45 @@ public class DeliveryDrone extends Robot{
 
     public int runDeliveryDrone() throws GameActionException {
         Team enemy = rc.getTeam().opponent();
+        if (enemyHQ == null) {
+            for (RobotInfo r : rc.senseNearbyRobots()) {
+                if (r.team == enemy && r.type == RobotType.NET_GUN){
+                    enemyNG = r.location;
+                    int[] msg = new int[7];
+                    msg[0] = TEAM_ID;
+                    msg[1] = ENEMY_NG_FOUND;
+                    msg[2] = enemyNG.x;
+                    msg[3] = enemyNG.y;
+                    msg[4] = r.ID;
+                    sendMessage(msg,DEFCON1);
+                }
+                if (r.team == enemy && r.type == RobotType.HQ) {
+                    enemyHQ = r.location;
+                    int[] msg = new int[7];
+                    msg[0] = TEAM_ID;
+                    msg[1] = ENEMY_HQ_FOUND;
+                    msg[2] = enemyHQ.x;
+                    msg[3] = enemyHQ.y;
+                    msg[4] = r.ID;
+                    sendMessage(msg,DEFCON1);
+                }
+            }
+        }
         int res = 0;
         if (rc.isCurrentlyHoldingUnit()) {
            // System.out.println("I am holding a unit!");
             if (holding.team == enemy) {
                 //System.out.println("It's an enemy!");
-                tryMove(randomDirection());
+                for (Direction dir: directions){
+                    if (rc.canSenseLocation(rc.getLocation().add(dir)) && rc.senseFlooding(rc.getLocation().add(dir))){
+                        rc.dropUnit(dir);
+                        return 9;
+                    }
+                }
+                if (rc.getCooldownTurns() < 1) {
+                    while (!tryMove(waterPath))
+                        waterPath = randomDirection();
+                }
             }
             else {
                 //System.out.println("It's a friend!");
@@ -134,10 +157,6 @@ public class DeliveryDrone extends Robot{
         } else if (rc.isReady()) {
             //System.out.println("I'm empty handed");
             RobotInfo[] robots = rc.senseNearbyRobots();
-            if (robots.length == 0) {
-                //System.out.println("Nobody near me, let's head back to HQ");
-                pathTo(HQ);
-            }
             for (RobotInfo r : robots) {
                 if (r.team == enemy) {
                     //System.out.println("There are enemies near by!");
@@ -151,26 +170,22 @@ public class DeliveryDrone extends Robot{
                     }
                 }
             }
-            if (rc.getLocation().isAdjacentTo(HQ)){
-                res = adjacentHQMoves();
+            if (enemyHQ == null && enemyNG == null){
+                if (rc.getCooldownTurns() < 1) {
+                    while (!tryMove(waterPath))
+                        waterPath = randomDirection();
+                }
             }
-        }
-        if (rc.getLocation().distanceSquaredTo(HQ) <= 25) {
-            if (tryMove(rc.getLocation().directionTo(HQ).opposite()))
-                return res;
-            else if (tryMove(rc.getLocation().directionTo(HQ).opposite().rotateRight()))
-                return res;
-            else if (tryMove(rc.getLocation().directionTo(HQ).opposite().rotateLeft()))
-                return res;
-            else if (tryMove(rc.getLocation().directionTo(HQ).opposite().rotateRight().rotateRight()))
-                return res;
-            else if (tryMove(rc.getLocation().directionTo(HQ).opposite().rotateLeft().rotateLeft()))
-                return res;
-            else if (tryMove(rc.getLocation().directionTo(HQ).opposite().rotateRight().rotateRight().rotateRight()))
-                return res;
             else
-                tryMove(rc.getLocation().directionTo(HQ).opposite().rotateLeft().rotateLeft().rotateLeft());
+                attack();
         }
         return res;
+    }
+
+    public void attack() throws GameActionException{
+        if (enemyHQ != null)
+            pathTo(enemyHQ);
+        else
+            pathTo(enemyNG);
     }
 }

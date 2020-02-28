@@ -91,6 +91,7 @@ public class Miner extends Robot{
             return 8;
         }
         //let's build shit
+
         if (!design_school) {
             if (buildDesignSchool(Direction.CENTER))
                 return 6;
@@ -103,6 +104,8 @@ public class Miner extends Robot{
             return 1;
         else if (buildNetGun())
             return 7;
+        if (netGuns.isEmpty() && vaporators.isEmpty())
+            rc.disintegrate();
         return 5;
     }
 

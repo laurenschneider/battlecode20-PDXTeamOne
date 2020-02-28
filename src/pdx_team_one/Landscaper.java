@@ -2,11 +2,13 @@ package pdx_team_one;
 import battlecode.common.*;
 import java.util.ArrayList;
 
+import static battlecode.common.MapLocation.valueOf;
+
 public class Landscaper extends Robot{
 
-    private boolean [] landingSpots = new boolean[8];
     private MapLocation target = null;
     private ArrayList<MapLocation> dumpSpots = new ArrayList<>();
+    boolean[][] landed;
     //private ArrayList<MapLocation> digSpots = new ArrayList<>();
     //private ArrayList<MapLocation> landingSpots = new ArrayList<>();
     //private MapLocation[] outerWall = new MapLocation[24];
@@ -17,19 +19,16 @@ public class Landscaper extends Robot{
 
     Landscaper(RobotController r) throws GameActionException{
         super(r);
-        HQ = new MapLocation(0,0);
+        landed = new boolean[rc.getMapWidth()][rc.getMapHeight()];
         parseBlockchain();
-
-        int i = 0;
         for (Direction dir: directions) {
-            //dumpSpots.add(HQ.add(dir));
-            //outerWall[i] = HQ.add(dir).add(dir).add(dir.rotateLeft());
-            //outerWall[i+1] = HQ.add(dir).add(dir).add(dir);
-            //outerWall[i+2] = HQ.add(dir).add(dir).add(dir.rotateRight());
-            dumpSpots.add(HQ.add(dir).add(dir).add(dir.rotateLeft()));
             dumpSpots.add(HQ.add(dir).add(dir).add(dir));
+        }
+        for (Direction dir: directions) {
             dumpSpots.add(HQ.add(dir).add(dir).add(dir.rotateRight()));
-            //i += 3;
+        }
+        for (Direction dir: directions) {
+            dumpSpots.add(HQ.add(dir).add(dir).add(dir.rotateLeft()));
         }
     }
 
@@ -58,7 +57,7 @@ public class Landscaper extends Robot{
                     res = 2;
                 }
                 else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == HQ_TARGET_ACQUIRED){
-                    landingSpots[t.getMessage()[2]] = true;
+                    landed[t.getMessage()[2]][t.getMessage()[3]] = true;
                     res = 3;
                 }
             }
@@ -75,7 +74,7 @@ public class Landscaper extends Robot{
                 enemyHQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
                 t.getMessage()[4] = enemyHQID;
             } else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == HQ_TARGET_ACQUIRED) {
-                landingSpots[t.getMessage()[2]] = true;
+                landed[t.getMessage()[2]][t.getMessage()[3]] = true;
             }
         }
     }
@@ -97,30 +96,28 @@ public class Landscaper extends Robot{
 
     public void defend()throws GameActionException{
         if (target == null) {
-            int dir = -1;
-            for (int i = 0; i < 8; i++) {
-                if (!landingSpots[i]) {
-                    target = HQ.add(directions[i]).add(directions[i]).add(directions[i]);
-                    dir = i;
+            for (MapLocation d : dumpSpots) {
+                if (!landed[d.x][d.y]) {
+                    target = d;
                     break;
                 }
             }
-            if (target != null) {
+            if (target != null){
                 int[] msg = new int[7];
                 msg[0] = TEAM_ID;
                 msg[1] = HQ_TARGET_ACQUIRED;
-                msg[2] = dir;
-                msg[3] = rc.getID();
-                System.out.println("Target acquired! " + dir);
+                msg[2] = target.x;
+                msg[3] = target.y;
+                msg[4] = rc.getID();
+                System.out.println("Target acquired! " + target);
                 if (!sendMessage(msg, DEFCON3)) {
                     pathTo(target);
                     target = null;
                     System.out.println("jk message didn't send");
                     return;
                 }
+                landed[target.x][target.y] = true;
             }
-            else
-                pathTo(HQ);
         }
 
         MapLocation current = rc.getLocation();

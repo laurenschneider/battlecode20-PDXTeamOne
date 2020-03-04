@@ -1,6 +1,7 @@
 package pdx_team_one;
 import battlecode.common.*;
 
+import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -12,9 +13,12 @@ public class DeliveryDrone extends Robot{
     private HashSet<MapLocation> water = new HashSet<>();
     private RobotInfo holding;
     private static Direction path = Direction.NORTH;
-    private boolean minerDeliver;
     private boolean ds_secure = false;
     private MapLocation home;
+    private boolean attackStrat;
+    private ArrayDeque<MapLocation> innerSpots = new ArrayDeque<>();
+    private ArrayDeque<MapLocation> wallSpots = new ArrayDeque<>();
+    private ArrayDeque<MapLocation> outerSpots = new ArrayDeque<>();
 
     DeliveryDrone(RobotController r) throws GameActionException
     {
@@ -22,6 +26,28 @@ public class DeliveryDrone extends Robot{
         for (int i = 1; i < rc.getRoundNum(); i++)
             parseBlockchain(i);
         home = rc.getLocation();
+        if (attackStrat) {
+            for (Direction dir : directions)
+                wallSpots.add(HQ.add(dir).add(dir).add(dir));
+            for (Direction dir : directions)
+                wallSpots.add(HQ.add(dir).add(dir).add(dir.rotateRight()));
+            for (Direction dir : directions)
+                wallSpots.add(HQ.add(dir).add(dir).add(dir.rotateLeft()));
+        }
+        else{
+            for (Direction dir : corners)
+                innerSpots.add(HQ.add(dir));
+            for (Direction dir : directions)
+                wallSpots.add(HQ.add(dir).add(dir));
+            for (Direction dir : directions)
+                wallSpots.add(HQ.add(dir).add(dir.rotateRight()));
+            for (Direction dir : directions)
+                outerSpots.add(HQ.add(dir).add(dir).add(dir));
+            for (Direction dir : directions)
+                outerSpots.add(HQ.add(dir).add(dir).add(dir.rotateRight()));
+            for (Direction dir : directions)
+                outerSpots.add(HQ.add(dir).add(dir).add(dir.rotateLeft()));
+        }
     }
 
     public void takeTurn() throws GameActionException {
@@ -37,16 +63,60 @@ public class DeliveryDrone extends Robot{
         }
     }
 
+     boolean deliverLS(ArrayDeque<MapLocation> spots) throws GameActionException{
+        ArrayDeque<MapLocation> toRemove = new ArrayDeque<>();
+        MapLocation target = null;
+        for (MapLocation m : spots){
+            if (rc.canSenseLocation(m)){
+                RobotInfo r = rc.senseRobotAtLocation(m);
+                if (r != null && r.type == RobotType.LANDSCAPER)
+                    toRemove.add(m);
+                else if (rc.getLocation().isAdjacentTo(m)) {
+                    if (rc.getLocation().equals(m)){
+                        for (Direction dir : directions)
+                            tryMove(dir);
+                        break;
+                    }
+                    if (rc.canDropUnit(rc.getLocation().directionTo(m))) {
+                        rc.dropUnit(rc.getLocation().directionTo(m));
+                        toRemove.add(m);
+                        break;
+                    }
+                }
+                else if (target == null)
+                    target = m;
+                else
+                    target = closestLocation(new MapLocation[] {target,m});
+            }
+            else if (target == null)
+                target = m;
+            else
+                target = closestLocation(new MapLocation[] {target,m});
+        }
+        spots.removeAll(toRemove);
+        if (target == null && rc.isReady())
+            return false;
+        if (rc.isReady())
+            pathTo(target);
+        return true;
+    }
+
     int deliverFriend() throws GameActionException {
+        if (holding.type == RobotType.LANDSCAPER) {
+            if (!innerSpots.isEmpty() && deliverLS(innerSpots))
+                return 0;
+            if (!wallSpots.isEmpty() && deliverLS(wallSpots))
+                return 1;
+            if (!outerSpots.isEmpty() && deliverLS(outerSpots))
+                return 2;
+            return 3;
+        }
         int res = 0;
-        System.out.println("I have a friend! his ID is " + holding.ID);
-        System.out.println("He needs to go to " + friends.get(holding.ID)[DROPOFF]);
         if (rc.getLocation().equals(friends.get(holding.ID)[DROPOFF])){
             for (Direction dir : directions)
                 tryMove(dir);
         }
         else if (rc.getLocation().isAdjacentTo(friends.get(holding.ID)[DROPOFF])) {
-            System.out.println("Im adjacent to his landing spot!");
             //todo: what if everywhere is flooded?
             if (rc.senseFlooding(friends.get(holding.ID)[DROPOFF])){
                 for (Direction dir : directions){
@@ -64,12 +134,14 @@ public class DeliveryDrone extends Robot{
                 rc.dropUnit(rc.getLocation().directionTo(friends.get(holding.ID)[DROPOFF]));
                 friends.remove(holding.ID);
                 holding = null;
-                System.out.println("Dropped him off!");
+            }
+            else{
+                for (Direction dir : directions)
+                    tryMove(dir);
             }
             res = 1;
         }
         else {
-            System.out.println("trying to move to " + friends.get(holding.ID)[DROPOFF]);
             pathTo(friends.get(holding.ID)[DROPOFF]);
             res = 2;
         }
@@ -77,29 +149,27 @@ public class DeliveryDrone extends Robot{
     }
 
 
-    public int parseBlockchain(int i) throws GameActionException {
-        int res = 0;
+    public void parseBlockchain(int i) throws GameActionException {
         for (Transaction t : rc.getBlock(i)) {
-            if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == HQ_LOCATION) {
-                HQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
-                hqID = t.getMessage()[4];
-                res = 1;
-            } else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == ENEMY_HQ_FOUND) {
-                enemyHQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
-                enemyHQID = t.getMessage()[4];
-                res = 2;
-            } else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == ENEMY_NG_FOUND) {
-                enemyNG = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
-            } else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == HQ_TARGET_ACQUIRED) {
-                friends.put(t.getMessage()[4], new MapLocation[]{new MapLocation(t.getMessage()[2], t.getMessage()[3]), new MapLocation(t.getMessage()[5], t.getMessage()[6])});
-                res = 3;
-            } else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == NEED_DELIVERY) {
-                friends.put(t.getMessage()[4], new MapLocation[]{new MapLocation(t.getMessage()[2], t.getMessage()[3]), new MapLocation(t.getMessage()[5], t.getMessage()[6])});
-                res = 3;
-            } else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == DS_SECURE)
-                ds_secure = true;
+            if (t.getMessage()[0] == TEAM_ID) {
+                if (t.getMessage()[1] == HQ_LOCATION) {
+                    HQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
+                    hqID = t.getMessage()[4];
+                } else if (t.getMessage()[1] == ENEMY_HQ_FOUND) {
+                    enemyHQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
+                    enemyHQID = t.getMessage()[4];
+                } else if (t.getMessage()[1] == ENEMY_NG_FOUND) {
+                    enemyNG = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
+                //} else if (t.getMessage()[1] == HQ_TARGET_ACQUIRED) {
+                  //  friends.put(t.getMessage()[4], new MapLocation[]{new MapLocation(t.getMessage()[2], t.getMessage()[3]), new MapLocation(t.getMessage()[5], t.getMessage()[6])});
+                } else if (t.getMessage()[1] == NEED_DELIVERY) {
+                    friends.put(t.getMessage()[4], new MapLocation[]{new MapLocation(t.getMessage()[2], t.getMessage()[3]), new MapLocation(t.getMessage()[5], t.getMessage()[6])});
+                } else if (t.getMessage()[1] == DS_SECURE)
+                    ds_secure = true;
+                else if (t.getMessage()[1] == ATTACK)
+                    attackStrat = true;
+            }
         }
-        return res;
     }
 
     public int pickupUnit(MapLocation ml)throws GameActionException {
@@ -145,18 +215,21 @@ public class DeliveryDrone extends Robot{
             if (friends.containsKey(r.ID)){
                 if (friends.get(r.ID)[DROPOFF].equals(r.location))
                     friends.remove(r.ID);
-                else if (!ds_secure && r.type == RobotType.LANDSCAPER)
-                    continue;
                 else if (target == null)
                     target = r.location;
                 else
                     target = closestLocation(new MapLocation[]{target, r.location});
             }
+            else if (ds_secure && r.type == RobotType.LANDSCAPER && (r.location.distanceSquaredTo(HQ) > 13 && r.location.distanceSquaredTo(HQ) != 18))
+                pickupUnit(r.location);
         }
         if (target != null)
             return pickupUnit(target);
         else if (friends.isEmpty()) {
-            pathTo(home);
+            if (rc.getLocation().equals(home))
+                scout();
+            else
+                pathTo(home);
             return 666;
         }
         else {
@@ -168,10 +241,12 @@ public class DeliveryDrone extends Robot{
                 else
                     target = closestLocation(new MapLocation[]{friends.get(id)[PICKUP],target});
             }
-            if (target == null)
-                pathTo(home);
-            else
+            if (target != null)
                 pathTo(target);
+            else if (rc.getLocation().equals(home))
+                scout();
+            else
+                pathTo(home);
         }
         return 0;
     }

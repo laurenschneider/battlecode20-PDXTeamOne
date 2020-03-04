@@ -15,7 +15,7 @@ public class MinerTest {
     Miner testMiner = new Miner(rcMock);
 
     public MinerTest() throws GameActionException {}
-
+/*
     @Test
     public void scoutTakeTurn() throws GameActionException{
         Mockito.doReturn(2).when(rcMock).getRoundNum();
@@ -29,6 +29,7 @@ public class MinerTest {
         Mockito.doReturn(true).when(rcMock).isReady();
         testMiner.takeTurn();
     }
+    */
 /*
     @Test
     public void minerTakeTurn() throws GameActionException{

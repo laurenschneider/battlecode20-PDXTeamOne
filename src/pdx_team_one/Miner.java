@@ -59,9 +59,12 @@ public class Miner extends Robot{
             }
         }
         refineries.add(HQ);
+        scoutPath = rc.getLocation().directionTo(HQ).opposite();
     }
     public void takeTurn() throws GameActionException {
         parseBlockchain(rc.getRoundNum() - 1);
+        if (rc.getLocation().distanceSquaredTo(HQ) <=18 && rc.senseElevation(rc.getLocation()) - hqElevation >= 15)
+            rc.disintegrate();
         if (scout)
             doScoutThings();
         else if (builder)
@@ -101,12 +104,12 @@ public class Miner extends Robot{
         MapLocation[] soups = rc.senseNearbySoup();
         //let's build shit
 
-        if (!fulfillment_center && rc.getTeamSoup() >= RobotType.FULFILLMENT_CENTER.cost) {
-            buildFulfillmentCenter();
-            return 4;
-        } else if (fulfillment_center && !design_school && rc.getTeamSoup() >= RobotType.DESIGN_SCHOOL.cost) {
+        if (!design_school && rc.getTeamSoup() >= RobotType.DESIGN_SCHOOL.cost) {
             buildDesignSchool(Direction.CENTER);
             return 6;
+        }else if (!fulfillment_center && design_school &&rc.getTeamSoup() >= RobotType.FULFILLMENT_CENTER.cost) {
+            buildFulfillmentCenter();
+            return 4;
         } else if (design_school && !vaporators.isEmpty() && rc.getTeamSoup() >= RobotType.VAPORATOR.cost) {
             buildVaporator();
             return 1;
@@ -246,8 +249,6 @@ public class Miner extends Robot{
     }
 
     private void scout() throws GameActionException{
-        if (rc.getLocation().distanceSquaredTo(HQ) <= 25)
-            scoutPath = rc.getLocation().directionTo(HQ).opposite();
         if (rc.isReady()) {
             while(!tryMove(scoutPath))
                 scoutPath = randomDirection();

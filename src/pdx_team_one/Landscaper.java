@@ -1,6 +1,7 @@
 package pdx_team_one;
 import battlecode.common.*;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 
 public class Landscaper extends Robot{
@@ -71,12 +72,12 @@ public class Landscaper extends Robot{
         }
         digSpots.removeAll(dumpSpots);
         digSpots.removeAll(dsdumpSpots);
-        digSpots.remove(fc);
         digSpots.remove(ds);
         for (RobotInfo ri : rc.senseNearbyRobots(5,rc.getTeam())){
             if (ri.type == RobotType.DESIGN_SCHOOL)
                 dsElevation = rc.senseElevation(ri.location);
         }
+        target = landSpots.get(0);
     }
 
 
@@ -98,22 +99,21 @@ public class Landscaper extends Robot{
                 } else if (t.getMessage()[1] == ENEMY_HQ_FOUND) {
                     enemyHQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
                     t.getMessage()[4] = enemyHQID;
-                } else if (t.getMessage()[1] == HQ_TARGET_ACQUIRED) {
-                    landed[t.getMessage()[2]][t.getMessage()[3]] = true;
+                    //} else if (t.getMessage()[1] == HQ_TARGET_ACQUIRED) {
+                    //landed[t.getMessage()[2]][t.getMessage()[3]] = true;
                 } else if (t.getMessage()[1] == ATTACK) {
                     //fc_secure = true;
                     ds_secure = true;
                     attackStrat = true;
                 } else if (t.getMessage()[1] == DEFENSE) {
-                    fc = new MapLocation(t.getMessage()[2],t.getMessage()[3]);
-                    ds = new MapLocation(t.getMessage()[4],t.getMessage()[5]);
+                    fc = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
+                    ds = new MapLocation(t.getMessage()[4], t.getMessage()[5]);
                     attackStrat = false;
                 } //else if (t.getMessage()[1] == FC_SECURE){
-                    //fc_secure = true;
-                else if (t.getMessage()[1] == DS_SECURE){
+                //fc_secure = true;
+                else if (t.getMessage()[1] == DS_SECURE) {
                     ds_secure = true;
-                }
-                else if (t.getMessage()[1] == START_PHASE_2){
+                } else if (t.getMessage()[1] == START_PHASE_2) {
                     startDump = true;
                 }
             }
@@ -136,6 +136,7 @@ public class Landscaper extends Robot{
     }
 
     public void defend()throws GameActionException {
+    /*
         if (target == null) {
             for (MapLocation d : landSpots) {
                 if (!landed[d.x][d.y]) {
@@ -161,57 +162,66 @@ public class Landscaper extends Robot{
                 }
                 landed[target.x][target.y] = true;
             }
-        }
+        }*/
+
 
         if (!ds_secure)
             secureDS();
         if (!ds_secure)
             return;
-
         MapLocation current = rc.getLocation();
-        if (attackStrat) {
-            ArrayList<MapLocation> toRemove = new ArrayList<>();
-            MapLocation dump = current;
-            if (current.equals(target) && rc.getDirtCarrying() > 0){
-                for (MapLocation m : dumpSpots){
-                    if (!rc.canSenseLocation(m))
-                        toRemove.add(m);
-                    else if (!current.isAdjacentTo(m))
-                        toRemove.add(m);
-                    else if (rc.senseElevation(m) < rc.senseElevation(dump))
-                        dump = m;
-                }
-                dumpSpots.removeAll(toRemove);
-                if (tryDig(current.directionTo(dump)))
-                    return;
-            }
-            if (current.equals(target)){
-                for (MapLocation m : digSpots)
-                    if (m.isAdjacentTo(current) & tryDig(current.directionTo(m)))
+        if (!landSpots.contains(current)) {
+            if (attackStrat)
+                target = closestLocation(landSpots.toArray(new MapLocation[0]));
+            else {
+                for (MapLocation d : digSpots) {
+                    if (rc.canSenseLocation(d) && rc.getLocation().isAdjacentTo(d) && tryDig(rc.getLocation().directionTo(d)))
                         return;
+                }
+                return;
             }
-            if (!rc.canSenseLocation(target))
-                pathTo(target);
-            else if (rc.senseFlooding(target)){
-                if (current.isAdjacentTo(target)){
+            if (rc.senseFlooding(target)) {
+                if (current.isAdjacentTo(target)) {
                     if (rc.getDirtCarrying() > 0)
                         tryDeposit(current.directionTo(target));
-                    else{
+                    else {
                         MapLocation dig = null;
-                        for (MapLocation m : digSpots){
+                        for (MapLocation m : digSpots) {
                             if (current.isAdjacentTo(m) && tryDig(current.directionTo(m)))
                                 return;
                             else if (dig == null)
                                 dig = m;
                             else
-                                dig = closestLocation(new MapLocation[]{dig,m});
+                                dig = closestLocation(new MapLocation[]{dig, m});
                         }
                         pathTo(dig);
                     }
                 }
             }
+            return;
+        }
+        if (attackStrat) {
+            ArrayList<MapLocation> toRemove = new ArrayList<>();
+            MapLocation dump = null;
+            if (rc.getDirtCarrying() > 0) {
+                for (MapLocation m : dumpSpots) {
+                    if (!rc.canSenseLocation(m))
+                        toRemove.add(m);
+                    else if (!current.isAdjacentTo(m))
+                        toRemove.add(m);
+                    else if (dump == null || rc.senseElevation(m) < rc.senseElevation(dump))
+                        dump = m;
+                }
+                dumpSpots.removeAll(toRemove);
+                if (tryDeposit(current.directionTo(dump)))
+                    return;
+            }
+            for (MapLocation m : digSpots) {
+                if (rc.canSenseLocation(m) && current.isAdjacentTo(m) & tryDig(current.directionTo(m)))
+                    return;
+            }
         } else {
-            if (startDump && current.equals(target) && rc.getDirtCarrying() > 0) {
+            if (startDump && rc.getDirtCarrying() > 0) {
                 MapLocation dump = null;
                 ArrayList<MapLocation> toRemove = new ArrayList<>();
                 for (MapLocation d : dumpSpots) {
@@ -230,15 +240,9 @@ public class Landscaper extends Robot{
                 if (tryDeposit(current.directionTo(dump)))
                     return;
             }
-            if (current.equals(target)) {
-                System.out.println("Digging dirt");
-                for (MapLocation m : digSpots) {
-                    if (rc.getLocation().isAdjacentTo(m) && tryDig(rc.getLocation().directionTo(m)))
-                        return;
-                }
-            } else {
-                System.out.println("Trying to get to " + target);
-                pathTo(target);
+            for (MapLocation m : digSpots) {
+                if (rc.canSenseLocation(m) && rc.getLocation().isAdjacentTo(m) && tryDig(rc.getLocation().directionTo(m)))
+                    return;
             }
         }
     }
@@ -246,14 +250,12 @@ public class Landscaper extends Robot{
     public boolean tryDeposit(Direction dir) throws GameActionException{
         RobotInfo r = rc.senseRobotAtLocation(rc.getLocation().add(dir));
         if (r != null && r.type == RobotType.MINER) {
-            System.out.println("Failed to deposit " + dir);
             return false;
         }
         if (rc.isReady() && rc.canDepositDirt(dir)) {
             rc.depositDirt(dir);
             return true;
         }
-        System.out.println("Failed to deposit " + dir);
         return false;
     }
 
@@ -271,18 +273,18 @@ public class Landscaper extends Robot{
     private void secureDS()throws GameActionException{
         if (!rc.isReady())
             return;
-        if (rc.getDirtCarrying() == 0){
+         if (rc.getDirtCarrying() > 0) {
+             for (MapLocation m : dsdumpSpots) {
+                 if (rc.canSenseLocation(m) && rc.senseElevation(m) - dsElevation < 3) {
+                     if (rc.getLocation().isAdjacentTo(m) && tryDeposit(rc.getLocation().directionTo(m)))
+                         return;
+                 }
+             }
+         }
+        else{
             for (MapLocation m : digSpots){
                 if (rc.canSenseLocation(m) && rc.getLocation().isAdjacentTo(m) && tryDig(rc.getLocation().directionTo(m)))
                     return;
-            }
-        }
-        else {
-            for (MapLocation m : dsdumpSpots) {
-                if (rc.canSenseLocation(m) && rc.senseElevation(m) - dsElevation < 3) {
-                    if (rc.getLocation().isAdjacentTo(m) && tryDeposit(rc.getLocation().directionTo(m)))
-                        return;
-                }
             }
         }
         ds_secure = true;

@@ -1,60 +1,144 @@
 package pdx_team_one;
 import battlecode.common.*;
 
+import java.util.ArrayList;
+
 public class HQ extends Robot{
 
     int numMiners = 0;
-    static boolean locationSent = false;
+    int maxMiners = 6;
+    private boolean attack;
+    private boolean strategy;
+    private boolean locationSent;
+    int phase = 1;
+    ArrayList<MapLocation> buildings = new ArrayList<>();
 
-    HQ(RobotController r) {
+    HQ(RobotController r) throws GameActionException{
         super(r);
+        HQ = rc.getLocation();
+        initBuildings();
     }
 
     public void takeTurn() throws GameActionException {
-        if (!locationSent) {
-           sendLocation();
-           locationSent = true;
-        }
-        buildMiners();
+        if (!locationSent)
+            locationSent = sendLocation();
+        else if (!strategy)
+            strategy = determineStrategy();
         defense();
+        if (numMiners < maxMiners)
+            numMiners = buildMiners();
+        if (!attack)
+            checkPhase();
     }
 
     public boolean sendLocation() throws GameActionException {
         int [] message = new int[7];
-        message[0] = TEAM_ID;      // 8 ones means it's us
+        message[0] = TEAM_ID;
         message[1] = HQ_LOCATION;
         message[2] = rc.getLocation().x;
         message[3] = rc.getLocation().y;
         message[4] = rc.getID();
         message[5] = rc.senseElevation(rc.getLocation());
-
-        return sendMessage(message,DEFCON4);
+        return sendMessage(message,DEFCON5);
     }
 
     public int buildMiners() throws GameActionException {
-        if(numMiners < 6) {
-            for (Direction dir : directions) {
-                boolean res = tryBuild(RobotType.MINER, dir);
-                if (res) {
-                    numMiners++;
-                }
+        for (Direction dir : corners)
+            if (tryBuild(RobotType.MINER, dir))
+                return ++numMiners;
+        for (Direction dir : Direction.cardinalDirections())
+            if (tryBuild(RobotType.MINER, dir)) {
+                return ++numMiners;
             }
-        }
         return numMiners;
     }
 
-    public boolean defense() throws GameActionException {
-        // HQ has built in net gun
-        Team opponent = rc.getTeam().opponent();
-        RobotInfo[] enemiesInRange = rc.senseNearbyRobots(GameConstants.NET_GUN_SHOOT_RADIUS_SQUARED, opponent);
-        for (RobotInfo e : enemiesInRange) {
-            if (e.type == RobotType.DELIVERY_DRONE) {
-                if (rc.canShootUnit(e.ID)){
-                    rc.shootUnit(e.ID);
+    public boolean determineStrategy()throws GameActionException{
+        int soup = 0;
+        for (MapLocation m: rc.senseNearbySoup())
+            soup += rc.senseSoup(m);
+        if (soup < 2000){
+            System.out.println("Not enough soup");
+            int[] msg = new int[7];
+            msg[0] = TEAM_ID;
+            msg[1] = ATTACK;
+            attack = true;
+            return sendMessage(msg,DEFCON5);
+        }
+        MapLocation fc = null,ds = null;
+        for (MapLocation m : buildings){
+            if (evaluate(m)) {
+                if (fc == null)
+                    fc = m;
+                else if (m.distanceSquaredTo(fc) <=9 && !m.isAdjacentTo(fc)) {
+                    ds = m;
                     break;
                 }
             }
         }
-        return false;
+        if (ds == null) {
+            System.out.println("No suitable locations");
+            int[] msg = new int[7];
+            msg[0] = TEAM_ID;
+            msg[1] = ATTACK;
+            attack = true;
+            return sendMessage(msg, DEFCON5);
+        }
+        else{
+            System.out.println(fc + ", " + ds);
+            int[] msg = new int[7];
+            msg[0] = TEAM_ID;
+            msg[1] = DEFENSE;
+            msg[2] = fc.x;
+            msg[3] = fc.y;
+            msg[4] = ds.x;
+            msg[5] = ds.y;
+            return sendMessage(msg,DEFCON5);
+        }
+    }
+
+    public boolean evaluate(MapLocation m)throws GameActionException{
+        if (!rc.canSenseLocation(m))
+            return false;
+        if (rc.senseElevation(m) < 3)
+            return false;
+        if (rc.senseElevation(m) - rc.senseElevation(HQ) > 3 || rc.senseElevation(m) - rc.senseElevation(HQ) < -3)
+            return false;
+        for (Direction dir : directions){
+            if (rc.canSenseLocation(m.add(dir)) && rc.senseElevation(m.add(dir)) < 3)
+                return false;
+        }
+        return true;
+    }
+
+    public void initBuildings(){
+        for (int i = -2; i <= 2; i++) {
+            buildings.add(HQ.translate(i, 5));
+            buildings.add(HQ.translate(i, -5));
+            buildings.add(HQ.translate(5, i));
+            buildings.add(HQ.translate(-5, i));
+        }
+        for (int i = -3; i <= 3; i++) {
+            buildings.add(HQ.translate(i, 4));
+            buildings.add(HQ.translate(i, -4));
+            buildings.add(HQ.translate(4, i));
+            buildings.add(HQ.translate(-4, i));
+        }
+    }
+
+    public void checkPhase() throws GameActionException{
+        if (phase == 1){
+            for (Direction dir: Direction.cardinalDirections()){
+                RobotInfo r = rc.senseRobotAtLocation(HQ.add(dir));
+                if (r == null || (r.type != RobotType.VAPORATOR && r.type != RobotType.NET_GUN))
+                    return;
+            }
+            System.out.println("Starting phase 2");
+            int[] msg = new int[7];
+            msg[0] = TEAM_ID;
+            msg[1] = START_PHASE_2;
+            if(sendMessage(msg,DEFCON5))
+                phase++;
+        }
     }
 }

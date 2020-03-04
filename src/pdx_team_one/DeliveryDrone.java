@@ -2,31 +2,78 @@ package pdx_team_one;
 import battlecode.common.*;
 
 import java.util.HashMap;
+import java.util.HashSet;
 
 public class DeliveryDrone extends Robot{
 
-    private HashMap<Integer, MapLocation> landscapers = new HashMap<>();
+    private int PICKUP = 1;
+    private int DROPOFF = 0;
+    private HashMap<Integer, MapLocation[]> friends = new HashMap<>();
+    private HashSet<MapLocation> water = new HashSet<>();
     private RobotInfo holding;
-    private static Direction waterPath = Direction.NORTH;
+    private static Direction path = Direction.NORTH;
+    private boolean minerDeliver;
+    private boolean ds_secure = false;
+    private MapLocation home;
 
     DeliveryDrone(RobotController r) throws GameActionException
     {
         super(r);
         for (int i = 1; i < rc.getRoundNum(); i++)
             parseBlockchain(i);
+        home = rc.getLocation();
     }
 
     public void takeTurn() throws GameActionException {
         parseBlockchain(rc.getRoundNum()-1);
-        runDeliveryDrone();
+        if (rc.isReady()) {
+            if (rc.isCurrentlyHoldingUnit()) {
+                if (holding.team == rc.getTeam())
+                    deliverFriend();
+                else
+                    destroyEnemy();
+            } else
+                findSomethingToDo();
+        }
     }
 
-    public void setHolding(RobotInfo ri) {
-        this.holding = ri;
-    }
-
-    public void addLandscaper(Integer key, MapLocation loc) {
-        this.landscapers.put(key, loc);
+    int deliverFriend() throws GameActionException {
+        int res = 0;
+        System.out.println("I have a friend! his ID is " + holding.ID);
+        System.out.println("He needs to go to " + friends.get(holding.ID)[DROPOFF]);
+        if (rc.getLocation().equals(friends.get(holding.ID)[DROPOFF])){
+            for (Direction dir : directions)
+                tryMove(dir);
+        }
+        else if (rc.getLocation().isAdjacentTo(friends.get(holding.ID)[DROPOFF])) {
+            System.out.println("Im adjacent to his landing spot!");
+            //todo: what if everywhere is flooded?
+            if (rc.senseFlooding(friends.get(holding.ID)[DROPOFF])){
+                for (Direction dir : directions){
+                    if (rc.senseFlooding(rc.getLocation().add(dir)))
+                        continue;
+                    if(rc.canDropUnit(dir)) {
+                        rc.dropUnit(dir);
+                        friends.remove(holding.ID);
+                        holding = null;
+                        return 1;
+                    }
+                }
+            }
+            else if (rc.canDropUnit(rc.getLocation().directionTo(friends.get(holding.ID)[DROPOFF]))) {
+                rc.dropUnit(rc.getLocation().directionTo(friends.get(holding.ID)[DROPOFF]));
+                friends.remove(holding.ID);
+                holding = null;
+                System.out.println("Dropped him off!");
+            }
+            res = 1;
+        }
+        else {
+            System.out.println("trying to move to " + friends.get(holding.ID)[DROPOFF]);
+            pathTo(friends.get(holding.ID)[DROPOFF]);
+            res = 2;
+        }
+        return res;
     }
 
 
@@ -44,148 +91,148 @@ public class DeliveryDrone extends Robot{
             } else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == ENEMY_NG_FOUND) {
                 enemyNG = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
             } else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == HQ_TARGET_ACQUIRED) {
-                landscapers.put(t.getMessage()[4], new MapLocation(t.getMessage()[2],t.getMessage()[3]));
+                friends.put(t.getMessage()[4], new MapLocation[]{new MapLocation(t.getMessage()[2], t.getMessage()[3]), new MapLocation(t.getMessage()[5], t.getMessage()[6])});
                 res = 3;
-            }
+            } else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == NEED_DELIVERY) {
+                friends.put(t.getMessage()[4], new MapLocation[]{new MapLocation(t.getMessage()[2], t.getMessage()[3]), new MapLocation(t.getMessage()[5], t.getMessage()[6])});
+                res = 3;
+            } else if (t.getMessage()[0] == TEAM_ID && t.getMessage()[1] == DS_SECURE)
+                ds_secure = true;
         }
         return res;
     }
 
-
-    int holdingFriend() throws GameActionException {
-        int res = 0;
-        if (rc.getLocation().equals(landscapers.get(holding.ID))){
-            for (Direction dir : directions)
-                tryMove(dir);
-        }
-        else if (rc.getLocation().isAdjacentTo(landscapers.get(holding.ID))) {
-            // System.out.println("Im adjacent to his landing spot!");
-            if (rc.canDropUnit(rc.getLocation().directionTo(landscapers.get(holding.ID)))) {
-                rc.dropUnit(rc.getLocation().directionTo(landscapers.get(holding.ID)));
-                holding = null;
-                //System.out.println("Dropped him off!");
+    public int pickupUnit(MapLocation ml)throws GameActionException {
+        if (rc.canSenseLocation(ml)) {
+            RobotInfo r = rc.senseRobotAtLocation(ml);
+            if (rc.canPickUpUnit(r.ID)) {
+                System.out.println("Picking up " + r.ID);
+                holding = r;
+                rc.pickUpUnit(r.ID);
+                return 1;
             }
-            res = 1;
+        }
+        pathTo(ml);
+        return 0;
+    }
+
+    public int findSomethingToDo() throws GameActionException {
+        for (RobotInfo r : rc.senseNearbyRobots(-1,rc.getTeam().opponent())) {
+            if (enemyNG == null && r.type == RobotType.NET_GUN ) {
+                enemyNG = r.location;
+                int[] msg = new int[7];
+                msg[0] = TEAM_ID;
+                msg[1] = ENEMY_NG_FOUND;
+                msg[2] = enemyNG.x;
+                msg[3] = enemyNG.y;
+                msg[4] = r.ID;
+                sendMessage(msg, DEFCON1);
+            } else if (enemyHQ == null && r.type == RobotType.HQ) {
+                enemyHQ = r.location;
+                int[] msg = new int[7];
+                msg[0] = TEAM_ID;
+                msg[1] = ENEMY_HQ_FOUND;
+                msg[2] = enemyHQ.x;
+                msg[3] = enemyHQ.y;
+                msg[4] = r.ID;
+                sendMessage(msg, DEFCON1);
+            }
+            else if (r.type == RobotType.LANDSCAPER || r.type == RobotType.MINER)
+                return pickupUnit(r.location);
+        }
+        MapLocation target = null;
+        for (RobotInfo r : rc.senseNearbyRobots(-1,rc.getTeam())){
+            if (friends.containsKey(r.ID)){
+                if (friends.get(r.ID)[DROPOFF].equals(r.location))
+                    friends.remove(r.ID);
+                else if (!ds_secure && r.type == RobotType.LANDSCAPER)
+                    continue;
+                else if (target == null)
+                    target = r.location;
+                else
+                    target = closestLocation(new MapLocation[]{target, r.location});
+            }
+        }
+        if (target != null)
+            return pickupUnit(target);
+        else if (friends.isEmpty()) {
+            pathTo(home);
+            return 666;
         }
         else {
-            //System.out.println("trying to move to " + landscapers.get(holding.ID));
-            pathTo(landscapers.get(holding.ID));
-            res = 2;
-        }
-        return res;
-    }
-
-    boolean nearbyEnemy(RobotInfo r) throws GameActionException {
-        boolean res = false;
-        if (rc.getLocation().isAdjacentTo(r.getLocation())) {
-            if (rc.canPickUpUnit(r.getID())) {
-                rc.pickUpUnit(r.getID());
-                holding = r;
-                res = true;
-            } else {
-                pathTo(r.location);
+            for (int id : friends.keySet()) {
+                if (ds_secure && rc.getLocation().equals(friends.get(id)[PICKUP]))
+                    friends.remove(id);
+                else if (target == null)
+                    target = friends.get(id)[PICKUP];
+                else
+                    target = closestLocation(new MapLocation[]{friends.get(id)[PICKUP],target});
             }
-        }
-        return res;
-    }
-
-    int nearbyLandscapers(RobotInfo r) throws GameActionException {
-        int res = 0;
-        // System.out.println(r.ID + " needs to move to " + landscapers.get(r.ID));
-        if (rc.getLocation().isAdjacentTo(r.location)) {
-            //System.out.println("I'm right next to him!");
-            if (rc.canPickUpUnit(r.getID())) {
-                //System.out.println("Got him");
-                rc.pickUpUnit(r.getID());
-                holding = r;
-                res = 1;
-            }
-        } else {
-            //System.out.println("Moving toward him");
-            pathTo(r.location);
-            res =2;
-        }
-        return res;
-    }
-
-    public int runDeliveryDrone() throws GameActionException {
-        Team enemy = rc.getTeam().opponent();
-        if (enemyHQ == null) {
-            for (RobotInfo r : rc.senseNearbyRobots()) {
-                if (r.team == enemy && r.type == RobotType.NET_GUN){
-                    enemyNG = r.location;
-                    int[] msg = new int[7];
-                    msg[0] = TEAM_ID;
-                    msg[1] = ENEMY_NG_FOUND;
-                    msg[2] = enemyNG.x;
-                    msg[3] = enemyNG.y;
-                    msg[4] = r.ID;
-                    sendMessage(msg,DEFCON1);
-                }
-                if (r.team == enemy && r.type == RobotType.HQ) {
-                    enemyHQ = r.location;
-                    int[] msg = new int[7];
-                    msg[0] = TEAM_ID;
-                    msg[1] = ENEMY_HQ_FOUND;
-                    msg[2] = enemyHQ.x;
-                    msg[3] = enemyHQ.y;
-                    msg[4] = r.ID;
-                    sendMessage(msg,DEFCON1);
-                }
-            }
-        }
-        int res = 0;
-        if (rc.isCurrentlyHoldingUnit()) {
-           // System.out.println("I am holding a unit!");
-            if (holding.team == enemy) {
-                //System.out.println("It's an enemy!");
-                for (Direction dir: directions){
-                    if (rc.canSenseLocation(rc.getLocation().add(dir)) && rc.senseFlooding(rc.getLocation().add(dir))){
-                        rc.dropUnit(dir);
-                        return 9;
-                    }
-                }
-                if (rc.getCooldownTurns() < 1) {
-                    while (!tryMove(waterPath))
-                        waterPath = randomDirection();
-                }
-            }
-            else {
-                //System.out.println("It's a friend!");
-                holdingFriend();
-            }
-        } else if (rc.isReady()) {
-            //System.out.println("I'm empty handed");
-            RobotInfo[] robots = rc.senseNearbyRobots();
-            for (RobotInfo r : robots) {
-                if (r.team == enemy) {
-                    //System.out.println("There are enemies near by!");
-                    boolean shouldBreak = nearbyEnemy(r);
-                    if(shouldBreak)
-                        break;
-                } else if (r.type == RobotType.LANDSCAPER) {
-                    // System.out.println("There are landscapers nearby");
-                    if (landscapers.containsKey(r.ID) && !r.location.equals(landscapers.get(r.ID))) {
-                        return nearbyLandscapers(r);
-                    }
-                }
-            }
-            if (enemyHQ == null && enemyNG == null){
-                if (rc.getCooldownTurns() < 1) {
-                    while (!tryMove(waterPath))
-                        waterPath = randomDirection();
-                }
-            }
+            if (target == null)
+                pathTo(home);
             else
-                attack();
+                pathTo(target);
         }
-        return res;
+        return 0;
     }
 
-    public void attack() throws GameActionException{
-        if (enemyHQ != null)
-            pathTo(enemyHQ);
+    public int scout() throws GameActionException{
+        while(!tryMove(path))
+            path = randomDirection();
+        return 0;
+    }
+
+    public int destroyEnemy() throws GameActionException{
+        MapLocation m;
+        for (Direction dir : directions) {
+            m = rc.getLocation().add(dir);
+            if (rc.canSenseLocation(m) && rc.senseFlooding(m)) {
+                water.add(m);
+                if (rc.canDropUnit(dir)) {
+                    rc.dropUnit(dir);
+                    holding = null;
+                    return 0;
+                }
+            }
+        }
+        for (Direction dir : directions) {
+            m = rc.getLocation().add(dir).add(dir).add(dir);
+            if (rc.canSenseLocation(m) && rc.senseFlooding(m)) {
+                water.add(m);
+                pathTo(rc.getLocation().add(dir).add(dir));
+                return 1;
+            }
+            m = rc.getLocation().add(dir).add(dir).add(dir.rotateRight());
+            if (rc.canSenseLocation(m) && rc.senseFlooding(m)) {
+                water.add(m);
+                pathTo(m);
+                return 1;
+            }
+        }
+        for (Direction dir : directions) {
+            m = rc.getLocation().add(dir).add(dir).add(dir);
+            if (rc.canSenseLocation(m) && rc.senseFlooding(m)) {
+                water.add(m);
+                pathTo(m);
+                return 2;
+            }
+            m = rc.getLocation().add(dir).add(dir).add(dir.rotateLeft());
+            if (rc.canSenseLocation(m) && rc.senseFlooding(m)) {
+                water.add(m);
+                pathTo(m);
+                return 2;
+            }
+            m = rc.getLocation().add(dir).add(dir).add(dir.rotateRight());
+            if (rc.canSenseLocation(m) && rc.senseFlooding(m)) {
+                water.add(m);
+                pathTo(m);
+                return 2;
+            }
+        }
+        if (water.isEmpty())
+            scout();
         else
-            pathTo(enemyNG);
+            pathTo(closestLocation(water.toArray(new MapLocation[0])));
+        return 3;
     }
 }

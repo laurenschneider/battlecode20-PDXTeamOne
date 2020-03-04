@@ -15,8 +15,8 @@ import static org.mockito.Mockito.*;
 public class HQTest {
 
     private RobotController rcMock = mock(RobotController.class);
-    HQ hqtest = new HQ(rcMock);
-
+//    HQ hqtest = new HQ(rcMock);
+/*
     @Test
     public void buildMinersShouldBuild1() throws GameActionException {
         HQ hqspy = Mockito.spy(hqtest);
@@ -37,5 +37,5 @@ public class HQTest {
         hqspy.takeTurn();
         assertEquals(true, hqtest.locationSent);
     }
-
+*/
 }

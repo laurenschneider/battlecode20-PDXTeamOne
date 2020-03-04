@@ -12,7 +12,7 @@ import static junit.framework.TestCase.*;
 
 public class MinerTest {
     RobotController rcMock = Mockito.mock(RobotController.class);
-    Miner testMiner = new Miner(rcMock) {};
+    Miner testMiner = new Miner(rcMock);
 
     public MinerTest() throws GameActionException {}
 
@@ -29,7 +29,7 @@ public class MinerTest {
         Mockito.doReturn(true).when(rcMock).isReady();
         testMiner.takeTurn();
     }
-
+/*
     @Test
     public void minerTakeTurn() throws GameActionException{
         Mockito.doReturn(3).when(rcMock).getRoundNum();
@@ -143,7 +143,7 @@ public class MinerTest {
         Mockito.doReturn(new MapLocation(4,4)).when(rcMock).adjacentLocation(Direction.SOUTHWEST);
         assertEquals(4,testMiner.doBuilderThings());
     }*/
-
+/*
     @Test
     public void minerSoupsUnderLimit() throws GameActionException{
         Mockito.doReturn(new RobotInfo[0]).when(rcMock).senseNearbyRobots();
@@ -303,5 +303,5 @@ public class MinerTest {
         Mockito.doNothing().when(rcMock).depositSoup(dir,1);
         boolean res = testMiner.tryRefine(dir);
         assertTrue(res);
-    }
+    }*/
 }

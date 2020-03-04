@@ -1,35 +1,59 @@
 package pdx_team_one;
 import battlecode.common.*;
 
-import java.util.HashSet;
-import java.util.Set;
-
 public class DesignSchool extends Robot{
     int numLS = 0;
-    private Set<Integer> drones = new HashSet<>();
-
-    DesignSchool(RobotController r) {
+    int maxLS = 4;
+    private boolean secure;
+    DesignSchool(RobotController r) throws GameActionException{
         super(r);
+        for (int i = 1; i < rc.getRoundNum(); i++)
+            parseBlockchain(i);
     }
 
     public void takeTurn() throws GameActionException{
-        int vapors = 0;
-        int netguns = 0;
-        for (RobotInfo r : rc.senseNearbyRobots()){
-            if (r.team == rc.getTeam() && r.type == RobotType.DELIVERY_DRONE)
-                drones.add(r.ID);
-            if (r.team == rc.getTeam() && r.type == RobotType.VAPORATOR)
-                vapors++;
-            if (r.team == rc.getTeam() && r.type == RobotType.NET_GUN)
-                netguns++;
-        }
-        if (numLS >= 8 && 2*numLS > drones.size())
-            return;
-        if ((vapors < 4 || netguns < 4) && numLS >= 8)
-            return;
-        for (Direction dir : directions) {
+        parseBlockchain(rc.getRoundNum()-1);
+        if (!secure)
+            secure = checkSecure();
+        if (numLS < maxLS && rc.getTeamSoup() >= RobotType.REFINERY.cost)
+            buildLS();
+    }
+
+    int buildLS() throws GameActionException{
+        for (Direction dir : corners) {
             if (tryBuild(RobotType.LANDSCAPER, dir))
-                numLS++;
+                return ++numLS;
         }
+        for (Direction dir : Direction.cardinalDirections()){
+            if (tryBuild(RobotType.LANDSCAPER, dir))
+                return ++numLS;
+        }
+        return numLS;
+    }
+
+    public int parseBlockchain(int round) throws GameActionException {
+        int res = 0;
+        for (Transaction t : rc.getBlock(round)) {
+            if (t.getMessage()[0] == TEAM_ID) {
+                if (t.getMessage()[1] == ATTACK)
+                    maxLS = 40;
+                else if (t.getMessage()[1] == DEFENSE)
+                    maxLS = 4;
+                else if (t.getMessage()[1] == START_PHASE_2)
+                    maxLS = 1000000;
+            }
+        }
+        return res;
+    }
+
+    public boolean checkSecure() throws GameActionException{
+        for (Direction dir : directions){
+            if (rc.canSenseLocation(rc.getLocation().add(dir)) &&rc.senseElevation(rc.getLocation().add(dir)) - rc.senseElevation(rc.getLocation()) < 3)
+                return false;
+        }
+        int[] msg = new int[7];
+        msg[0] = TEAM_ID;
+        msg[1] = DS_SECURE;
+        return sendMessage(msg,DEFCON5);
     }
 }

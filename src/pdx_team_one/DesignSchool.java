@@ -7,12 +7,13 @@ public class DesignSchool extends Robot{
     private boolean secure;
     DesignSchool(RobotController r) throws GameActionException{
         super(r);
-        for (int i = 1; i < rc.getRoundNum(); i++)
-            parseBlockchain(i);
+        for (; lastBlockRead < rc.getRoundNum(); lastBlockRead++)
+            parseBlockchain(lastBlockRead);
     }
 
     public void takeTurn() throws GameActionException{
-        parseBlockchain(rc.getRoundNum()-1);
+        for (; lastBlockRead < rc.getRoundNum(); lastBlockRead++)
+            parseBlockchain(lastBlockRead);
         if (!secure)
             secure = checkSecure();
         if (numLS < maxLS && rc.getTeamSoup() >= RobotType.REFINERY.cost)

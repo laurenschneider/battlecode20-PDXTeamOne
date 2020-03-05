@@ -11,15 +11,16 @@ public class FulfillmentCenter extends Robot{
     int maxDrones;
     FulfillmentCenter(RobotController r)throws GameActionException {
         super(r);
-        for (int i = 1; i < rc.getRoundNum(); i++)
-            parseBlockchain(i);
+        for (; lastBlockRead < rc.getRoundNum(); lastBlockRead++)
+            parseBlockchain(lastBlockRead);
     }
 
     public void takeTurn() throws GameActionException {
-        parseBlockchain(rc.getRoundNum()-1);
-        if (num < maxDrones)
+        for (; lastBlockRead < rc.getRoundNum(); lastBlockRead++)
+            parseBlockchain(lastBlockRead);
+        if (rc.getTeamSoup() >= RobotType.REFINERY.cost && num < maxDrones)
             num = buildDrones();
-        else
+        else if (num == maxDrones)
             rc.disintegrate();
     }
 
@@ -42,7 +43,7 @@ public class FulfillmentCenter extends Robot{
                 if (t.getMessage()[1] == ATTACK) {
                     maxDrones = 100000;
                 } else if (t.getMessage()[1] == DEFENSE) {
-                    maxDrones = 4;
+                    maxDrones = 3;
                 }
             }
         }

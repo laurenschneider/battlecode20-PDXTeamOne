@@ -57,25 +57,27 @@ public class HQ extends Robot{
         int soup = 0;
         for (MapLocation m: rc.senseNearbySoup())
             soup += rc.senseSoup(m);
-        if (soup < 2000){
+        /*if (soup < 2000){
             System.out.println("Not enough soup");
             int[] msg = new int[7];
             msg[0] = TEAM_ID;
             msg[1] = ATTACK;
             attack = true;
             return sendMessage(msg,DEFCON5);
-        }
+        }*/
+
         MapLocation fc = null,ds = null;
         for (MapLocation m : buildings){
             if (evaluate(m)) {
-                if (fc == null)
-                    fc = m;
-                else if (m.distanceSquaredTo(fc) <=9 && !m.isAdjacentTo(fc)) {
+                //if (fc == null)
+                  //  fc = m;
+                //else if (m.distanceSquaredTo(fc) <=9 && !m.isAdjacentTo(fc)) {
                     ds = m;
                     break;
-                }
+               // }
             }
         }
+
         if (ds == null) {
             System.out.println("No suitable locations");
             int[] msg = new int[7];
@@ -89,8 +91,8 @@ public class HQ extends Robot{
             int[] msg = new int[7];
             msg[0] = TEAM_ID;
             msg[1] = DEFENSE;
-            msg[2] = fc.x;
-            msg[3] = fc.y;
+            msg[2] = 0;//fc.x;
+            msg[3] = 0;//fc.y;
             msg[4] = ds.x;
             msg[5] = ds.y;
             return sendMessage(msg,DEFCON5);
@@ -102,13 +104,14 @@ public class HQ extends Robot{
             return false;
         if (rc.senseElevation(m) < 3)
             return false;
-        if (rc.senseElevation(m) - rc.senseElevation(HQ) > 3 || rc.senseElevation(m) - rc.senseElevation(HQ) < -3)
+        if (rc.senseElevation(m) - rc.senseElevation(HQ) >= 3 || rc.senseElevation(m) - rc.senseElevation(HQ) <= -3)
             return false;
+        int spots = 0;
         for (Direction dir : directions){
-            if (rc.canSenseLocation(m.add(dir)) && rc.senseElevation(m.add(dir)) < 3)
-                return false;
+            if (rc.canSenseLocation(m.add(dir)) && rc.senseElevation(m) -  rc.senseElevation(m.add(dir)) <= 3 && rc.senseElevation(m.add(dir)) - rc.senseElevation(m) <= 3)
+                spots++;
         }
-        return true;
+        return (spots >= 4);
     }
 
     public void initBuildings(){

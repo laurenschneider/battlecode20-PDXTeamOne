@@ -14,7 +14,7 @@ public class DeliveryDrone extends Robot{
     private RobotInfo holding;
     private static Direction path = Direction.NORTH;
     private boolean ds_secure = false;
-    private MapLocation home;
+    private MapLocation home = null;
     private boolean attackStrat;
     private ArrayDeque<MapLocation> innerSpots = new ArrayDeque<>();
     private ArrayDeque<MapLocation> wallSpots = new ArrayDeque<>();
@@ -23,9 +23,10 @@ public class DeliveryDrone extends Robot{
     DeliveryDrone(RobotController r) throws GameActionException
     {
         super(r);
-        for (int i = 1; i < rc.getRoundNum(); i++)
-            parseBlockchain(i);
-        home = rc.getLocation();
+        for (; lastBlockRead < rc.getRoundNum(); lastBlockRead++)
+            parseBlockchain(lastBlockRead);
+        if (home == null)
+            home = rc.getLocation();
         if (attackStrat) {
             for (Direction dir : directions)
                 wallSpots.add(HQ.add(dir).add(dir).add(dir));
@@ -51,6 +52,8 @@ public class DeliveryDrone extends Robot{
     }
 
     public void takeTurn() throws GameActionException {
+        for (; lastBlockRead < rc.getRoundNum(); lastBlockRead++)
+            parseBlockchain(lastBlockRead);
         parseBlockchain(rc.getRoundNum()-1);
         if (rc.isReady()) {
             if (rc.isCurrentlyHoldingUnit()) {
@@ -65,40 +68,31 @@ public class DeliveryDrone extends Robot{
 
      boolean deliverLS(ArrayDeque<MapLocation> spots) throws GameActionException{
         ArrayDeque<MapLocation> toRemove = new ArrayDeque<>();
-        MapLocation target = null;
-        for (MapLocation m : spots){
-            if (rc.canSenseLocation(m)){
+        for (MapLocation m : spots) {
+            if (rc.canSenseLocation(m)) {
                 RobotInfo r = rc.senseRobotAtLocation(m);
                 if (r != null && r.type == RobotType.LANDSCAPER)
                     toRemove.add(m);
-                else if (rc.getLocation().isAdjacentTo(m)) {
-                    if (rc.getLocation().equals(m)){
-                        for (Direction dir : directions)
-                            tryMove(dir);
-                        break;
-                    }
-                    if (rc.canDropUnit(rc.getLocation().directionTo(m))) {
-                        rc.dropUnit(rc.getLocation().directionTo(m));
-                        toRemove.add(m);
-                        break;
-                    }
+                else if (r == null && !rc.getLocation().equals(m) && rc.getLocation().isAdjacentTo(m) && rc.canDropUnit(rc.getLocation().directionTo(m))) {
+                    System.out.println("Dropping him off at " + m);
+                    rc.dropUnit(rc.getLocation().directionTo(m));
+                    toRemove.add(m);
+                    spots.removeAll(toRemove);
+                    return true;
                 }
-                else if (target == null)
-                    target = m;
-                else
-                    target = closestLocation(new MapLocation[] {target,m});
             }
-            else if (target == null)
-                target = m;
-            else
-                target = closestLocation(new MapLocation[] {target,m});
         }
         spots.removeAll(toRemove);
-        if (target == null && rc.isReady())
-            return false;
-        if (rc.isReady())
+        if (!spots.isEmpty()) {
+            MapLocation target = closestLocation(spots.toArray(new MapLocation[0]));
+            if (rc.getLocation().isAdjacentTo(target)){
+                for (Direction dir : directions)
+                    tryMove(dir);
+            }
             pathTo(target);
-        return true;
+            return true;
+        }
+        return false;
     }
 
     int deliverFriend() throws GameActionException {
@@ -111,6 +105,7 @@ public class DeliveryDrone extends Robot{
                 return 2;
             return 3;
         }
+        System.out.println("I have a friend and he needs to get to " + friends.get(holding.ID)[DROPOFF]);
         int res = 0;
         if (rc.getLocation().equals(friends.get(holding.ID)[DROPOFF])){
             for (Direction dir : directions)
@@ -160,22 +155,28 @@ public class DeliveryDrone extends Robot{
                     enemyHQID = t.getMessage()[4];
                 } else if (t.getMessage()[1] == ENEMY_NG_FOUND) {
                     enemyNG = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
-                //} else if (t.getMessage()[1] == HQ_TARGET_ACQUIRED) {
-                  //  friends.put(t.getMessage()[4], new MapLocation[]{new MapLocation(t.getMessage()[2], t.getMessage()[3]), new MapLocation(t.getMessage()[5], t.getMessage()[6])});
+                    //} else if (t.getMessage()[1] == HQ_TARGET_ACQUIRED) {
+                    //  friends.put(t.getMessage()[4], new MapLocation[]{new MapLocation(t.getMessage()[2], t.getMessage()[3]), new MapLocation(t.getMessage()[5], t.getMessage()[6])});
                 } else if (t.getMessage()[1] == NEED_DELIVERY) {
                     friends.put(t.getMessage()[4], new MapLocation[]{new MapLocation(t.getMessage()[2], t.getMessage()[3]), new MapLocation(t.getMessage()[5], t.getMessage()[6])});
+                    System.out.println("Incoming message! Friend " + t.getMessage()[4] + " needs to go to " + friends.get(t.getMessage()[4])[DROPOFF]);
+                    System.out.println("He's located at " + friends.get(t.getMessage()[4])[PICKUP]);
                 } else if (t.getMessage()[1] == DS_SECURE)
                     ds_secure = true;
                 else if (t.getMessage()[1] == ATTACK)
                     attackStrat = true;
+                else if (t.getMessage()[1] == DEFENSE) {
+                    home = new MapLocation(t.getMessage()[4],t.getMessage()[5]);
+                }
             }
         }
     }
 
     public int pickupUnit(MapLocation ml)throws GameActionException {
+        System.out.println("Gonna go pick up a bot at " + ml);
         if (rc.canSenseLocation(ml)) {
             RobotInfo r = rc.senseRobotAtLocation(ml);
-            if (rc.canPickUpUnit(r.ID)) {
+            if (rc.getLocation().isAdjacentTo(ml) && rc.canPickUpUnit(r.ID)) {
                 System.out.println("Picking up " + r.ID);
                 holding = r;
                 rc.pickUpUnit(r.ID);
@@ -220,13 +221,17 @@ public class DeliveryDrone extends Robot{
                 else
                     target = closestLocation(new MapLocation[]{target, r.location});
             }
-            else if (ds_secure && r.type == RobotType.LANDSCAPER && (r.location.distanceSquaredTo(HQ) > 13 && r.location.distanceSquaredTo(HQ) != 18))
-                pickupUnit(r.location);
+            else if (ds_secure && r.type == RobotType.LANDSCAPER && (r.location.distanceSquaredTo(HQ) > 13 && r.location.distanceSquaredTo(HQ) != 18)) {
+                if (target==null)
+                    target = r.location;
+                else
+                    target = closestLocation(new MapLocation[]{target,r.location});
+            }
         }
         if (target != null)
             return pickupUnit(target);
         else if (friends.isEmpty()) {
-            if (rc.getLocation().equals(home))
+            if (rc.getLocation().distanceSquaredTo(home) < 10)
                 scout();
             else
                 pathTo(home);
@@ -243,7 +248,7 @@ public class DeliveryDrone extends Robot{
             }
             if (target != null)
                 pathTo(target);
-            else if (rc.getLocation().equals(home))
+            else if (rc.getLocation().distanceSquaredTo(home) < 10)
                 scout();
             else
                 pathTo(home);

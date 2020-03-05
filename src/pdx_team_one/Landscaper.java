@@ -6,12 +6,13 @@ import java.util.ArrayList;
 
 public class Landscaper extends Robot{
 
-    private MapLocation target = null;
+    private MapLocation target;
     private ArrayList<MapLocation> dumpSpots = new ArrayList<>();
     private ArrayList<MapLocation> landSpots = new ArrayList<>();
+    private ArrayList<MapLocation> innerSpots = new ArrayList<>();
     private ArrayList<MapLocation> digSpots = new ArrayList<>();
     private ArrayList<MapLocation> dsdumpSpots = new ArrayList<>();
-    boolean[][] landed;
+    private ArrayList<MapLocation> firstDump = new ArrayList<>();
     public boolean attackStrat;
     public boolean startDump;
     public boolean ds_secure;
@@ -21,9 +22,8 @@ public class Landscaper extends Robot{
 
     Landscaper(RobotController r) throws GameActionException{
         super(r);
-        landed = new boolean[rc.getMapWidth()][rc.getMapHeight()];
-        for (int i = 1; i < rc.getRoundNum(); i++)
-            parseBlockchain(i);
+        for (; lastBlockRead < rc.getRoundNum(); lastBlockRead++)
+            parseBlockchain(lastBlockRead);
         if (attackStrat) {
             for (Direction dir : directions)
                 dumpSpots.add(HQ.add(dir).add(dir).add(dir));
@@ -37,14 +37,18 @@ public class Landscaper extends Robot{
         }
         else{
             for (Direction dir : corners) {
+                innerSpots.add(HQ.add(dir));
                 landSpots.add(HQ.add(dir));
                 digSpots.add(HQ.add(dir));
+                firstDump.add(HQ.add(dir.rotateRight()));
             }
             for (Direction dir : directions){
                 dsdumpSpots.add(ds.add(dir));
                 digSpots.add(ds.add(dir).add(dir));
                 digSpots.add(ds.add(dir).add(dir.rotateRight()));
                 dumpSpots.add(HQ.add(dir).add(dir));
+                firstDump.add(HQ.add(dir).add(dir));
+                firstDump.add(HQ.add(dir).add(dir.rotateRight()));
             }
             for (Direction dir : directions){
                 dumpSpots.add(HQ.add(dir).add(dir.rotateRight()));
@@ -82,7 +86,8 @@ public class Landscaper extends Robot{
 
 
     public void takeTurn() throws GameActionException {
-        parseBlockchain(rc.getRoundNum()-1);
+        for (; lastBlockRead < rc.getRoundNum(); lastBlockRead++)
+            parseBlockchain(lastBlockRead);
         if (rc.getLocation().distanceSquaredTo(HQ) < 100)
             defend();
         else
@@ -136,35 +141,6 @@ public class Landscaper extends Robot{
     }
 
     public void defend()throws GameActionException {
-    /*
-        if (target == null) {
-            for (MapLocation d : landSpots) {
-                if (!landed[d.x][d.y]) {
-                    target = d;
-                    break;
-                }
-            }
-            if (target != null) {
-                int[] msg = new int[7];
-                msg[0] = TEAM_ID;
-                msg[1] = HQ_TARGET_ACQUIRED;
-                msg[2] = target.x;
-                msg[3] = target.y;
-                msg[4] = rc.getID();
-                msg[5] = rc.getLocation().x;
-                msg[6] = rc.getLocation().y;
-                System.out.println("Target acquired! " + target);
-                if (!sendMessage(msg, DEFCON3)) {
-                    pathTo(target);
-                    target = null;
-                    System.out.println("jk message didn't send");
-                    return;
-                }
-                landed[target.x][target.y] = true;
-            }
-        }*/
-
-
         if (!ds_secure)
             secureDS();
         if (!ds_secure)
@@ -240,6 +216,27 @@ public class Landscaper extends Robot{
                 if (tryDeposit(current.directionTo(dump)))
                     return;
             }
+            else if (!startDump && rc.getDirtCarrying() > 0){
+                MapLocation dump = null;
+                ArrayList<MapLocation> toRemove = new ArrayList<>();
+                for (MapLocation d : firstDump) {
+                    if (!rc.canSenseLocation(d))
+                        toRemove.add(d);
+                    else if (!d.isAdjacentTo(current))
+                        toRemove.add(d);
+                    else if (rc.senseRobotAtLocation(d) != null && rc.senseRobotAtLocation(d).type != RobotType.MINER && rc.senseRobotAtLocation(d).type != RobotType.DELIVERY_DRONE )
+                        toRemove.add(d);
+                    else if (rc.senseElevation(d) - rc.senseElevation(HQ) >= 3)
+                        toRemove.add(d);
+                    else if (dump == null)
+                        dump = d;
+                    else if (rc.senseElevation(d) < rc.senseElevation(dump))
+                        dump = d;
+                }
+                firstDump.removeAll(toRemove);
+                if (dump != null && tryDeposit(current.directionTo(dump)))
+                    return;
+            }
             for (MapLocation m : digSpots) {
                 if (rc.canSenseLocation(m) && rc.getLocation().isAdjacentTo(m) && tryDig(rc.getLocation().directionTo(m)))
                     return;
@@ -248,10 +245,6 @@ public class Landscaper extends Robot{
     }
 
     public boolean tryDeposit(Direction dir) throws GameActionException{
-        RobotInfo r = rc.senseRobotAtLocation(rc.getLocation().add(dir));
-        if (r != null && r.type == RobotType.MINER) {
-            return false;
-        }
         if (rc.isReady() && rc.canDepositDirt(dir)) {
             rc.depositDirt(dir);
             return true;
@@ -274,7 +267,9 @@ public class Landscaper extends Robot{
         if (!rc.isReady())
             return;
          if (rc.getDirtCarrying() > 0) {
+             System.out.println("Gonna try and dump");
              for (MapLocation m : dsdumpSpots) {
+                 System.out.println("Checking dsdumpspot " + m);
                  if (rc.canSenseLocation(m) && rc.senseElevation(m) - dsElevation < 3) {
                      if (rc.getLocation().isAdjacentTo(m) && tryDeposit(rc.getLocation().directionTo(m)))
                          return;
@@ -282,11 +277,13 @@ public class Landscaper extends Robot{
              }
          }
         else{
+            System.out.println("it's digging time");
             for (MapLocation m : digSpots){
+                System.out.println("Checking dsdigspot " + m);
                 if (rc.canSenseLocation(m) && rc.getLocation().isAdjacentTo(m) && tryDig(rc.getLocation().directionTo(m)))
                     return;
             }
         }
-        ds_secure = true;
+        //ds_secure = true;
     }
 }

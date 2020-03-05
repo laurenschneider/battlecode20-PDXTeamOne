@@ -42,6 +42,7 @@ public abstract class Robot {
     static MapLocation enemyHQ = null;
     static MapLocation enemyNG = null;
     static int enemyHQID = 0;
+    static int lastBlockRead = 1;
 
     //TEAM_ID here is changed here for debugging because I can't figure out how
     //to scrimmage against a different team locally

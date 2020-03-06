@@ -71,7 +71,6 @@ public class Miner extends Robot {
     }
 
     public int doBuilderThings(MapLocation[] soups) throws GameActionException {
-        System.out.println("let's build shit");//let's build shit
         if (!design_school && rc.getTeamSoup() >= RobotType.DESIGN_SCHOOL.cost) {
             System.out.println("let's build a design school");//let's build shit
             buildDesignSchool();
@@ -269,20 +268,6 @@ public class Miner extends Robot {
     }
 
     private boolean buildFulfillmentCenter() throws GameActionException {
-        /*
-        if (rc.getLocation().equals(fc)){
-            for (Direction dir: directions)
-                tryMove(dir);
-        }
-        else if (rc.getLocation().isAdjacentTo(fc)) {
-            if (tryBuild(RobotType.FULFILLMENT_CENTER, rc.getLocation().directionTo(fc))) {
-                fulfillment_center = true;
-                return true;
-            }
-        }
-        else
-            pathTo(fc);
-            */
         for (Direction dir : directions) {
             MapLocation fc = rc.getLocation().add(dir);
             if (!rc.onTheMap(fc))
@@ -291,8 +276,8 @@ public class Miner extends Robot {
                 continue;
             else if (fc.isAdjacentTo(ds))
                 continue;
-            else if (rc.senseElevation(fc) < 3)
-                continue;
+            //else if (rc.senseElevation(fc) < 3)
+              //  continue;
             if (tryBuild(RobotType.FULFILLMENT_CENTER, dir)) {
                 fulfillment_center = true;
                 return true;

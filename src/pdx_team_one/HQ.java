@@ -1,6 +1,7 @@
 package pdx_team_one;
 import battlecode.common.*;
 
+import java.util.ArrayDeque;
 import java.util.HashSet;
 
 public class HQ extends Robot{
@@ -10,26 +11,64 @@ public class HQ extends Robot{
     private boolean attack;
     private boolean strategy;
     private boolean locationSent;
+    private boolean[][] visited = new boolean[rc.getMapWidth()][rc.getMapHeight()];
+    private HashSet<MapLocation> dsSpots = new HashSet<>();
+    private ArrayDeque<Node> checkSpots = new ArrayDeque<>();
     int phase = 1;
-    HashSet<MapLocation> buildings = new HashSet<>();
+
+    class Node{
+        int moves;
+        MapLocation loc;
+        Node(int m, MapLocation l){
+            moves = m;
+            loc = l;
+        }
+    }
 
     HQ(RobotController r) throws GameActionException{
         super(r);
         HQ = rc.getLocation();
-        initBuildings();
+        visited[HQ.x][HQ.y] = true;
+        checkSpots.add(new Node(0,HQ));
     }
 
     public void takeTurn() throws GameActionException {
         if (!locationSent) {
             locationSent = sendLocation();
-            strategy = determineStrategy();
             MapLocation[] soups = rc.senseNearbySoup();
             broadcastSoup(soups);
         }
         defense();
         if (numMiners < maxMiners)
             numMiners = buildMiners();
-        if (!attack)
+        if (!checkSpots.isEmpty())
+            BFS(checkSpots.remove());
+        else if (!strategy && Clock.getBytecodesLeft() > 15000){
+            MapLocation target = null;
+            for (MapLocation m : dsSpots){
+                if (target == null)
+                    target = m;
+                else if (rc.senseElevation(m) > rc.senseElevation(target))
+                    target = m;
+            }
+            if (target != null) {
+                int[] msg = new int[7];
+                msg[0] = TEAM_ID;
+                msg[1] = DEFENSE;
+                msg[2] = 0;//fc.x;
+                msg[3] = 0;//fc.y;
+                msg[4] = target.x;
+                msg[5] = target.y;
+                sendMessage(msg, DEFCON5);
+                System.out.println("DS: " + target);
+            }
+            else{
+                System.out.println("No suitable Locations");
+                rc.resign();
+            }
+            strategy = true;
+        }
+        else if (!attack)
             checkPhase();
     }
 
@@ -55,69 +94,41 @@ public class HQ extends Robot{
         return numMiners;
     }
 
-    public boolean determineStrategy()throws GameActionException {
-        int soup = 0;
-        for (MapLocation m : rc.senseNearbySoup())
-            soup += rc.senseSoup(m);
-        maxMiners = soup / 300;
-        if (maxMiners < 3)
-            maxMiners = 3;
-        if (maxMiners > 6)
-            maxMiners = 6;
-        /*if (soup < 2000){
-            System.out.println("Not enough soup");
-            int[] msg = new int[7];
-            msg[0] = TEAM_ID;
-            msg[1] = ATTACK;
-            attack = true;
-            return sendMessage(msg,DEFCON5);
-        }*/
 
-        MapLocation fc = null,ds = null;
-        for (MapLocation m : buildings){
-            if (evaluate(m)) {
-                    ds = m;
-                    break;
-            }
-        }
-
-        if (ds == null) {
-            System.out.println("No suitable locations");
-            rc.resign();
-            int[] msg = new int[7];
-            msg[0] = TEAM_ID;
-            msg[1] = ATTACK;
-            attack = true;
-            return sendMessage(msg, DEFCON5);
-        }
-        else{
-            System.out.println(fc + ", " + ds);
-            int[] msg = new int[7];
-            msg[0] = TEAM_ID;
-            msg[1] = DEFENSE;
-            msg[2] = 0;//fc.x;
-            msg[3] = 0;//fc.y;
-            msg[4] = ds.x;
-            msg[5] = ds.y;
-            return sendMessage(msg,DEFCON5);
-        }
-    }
-
-    public boolean evaluate(MapLocation m)throws GameActionException{
+    public boolean evaluate(MapLocation m)throws GameActionException {
         if (!rc.canSenseLocation(m))
             return false;
-        if (rc.senseElevation(m) < 3)
-            return false;
-        if (rc.senseElevation(m) - rc.senseElevation(HQ) >= 3 || rc.senseElevation(m) - rc.senseElevation(HQ) <= -3)
+        if (HQ.distanceSquaredTo(m) <= 13 || HQ.distanceSquaredTo(m) == 18)
             return false;
         int spots = 0;
-        for (Direction dir : directions){
-            if (rc.canSenseLocation(m.add(dir)) && rc.senseElevation(m) -  rc.senseElevation(m.add(dir)) <= 3 && rc.senseElevation(m.add(dir)) - rc.senseElevation(m) <= 3)
-                spots++;
+        for (Direction dir : directions) {
+            if (rc.canSenseLocation(m.add(dir))) {
+                if (rc.senseFlooding(m.add(dir)))
+                    return false;
+                if (rc.senseElevation(m) - rc.senseElevation(m.add(dir)) <= 3 && rc.senseElevation(m.add(dir)) - rc.senseElevation(m) <= 3)
+                    spots++;
+            }
         }
         return (spots >= 4);
     }
 
+    public void BFS(Node m) throws GameActionException{
+        if (m.moves <= 6) {
+            if (evaluate(m.loc))
+                dsSpots.add(m.loc);
+            for (Direction dir : directions) {
+                MapLocation check = m.loc.add(dir);
+                if (rc.onTheMap(check) && rc.canSenseLocation(check) && !visited[check.x][check.y]) {
+                    if (rc.senseElevation(m.loc) - rc.senseElevation(check) <= 3 && rc.senseElevation(check) - rc.senseElevation(m.loc) <= 3) {
+                        visited[check.x][check.y] = true;
+                        checkSpots.add(new Node(m.moves + 1, check));
+                    }
+                }
+            }
+        }
+        if (!checkSpots.isEmpty() && Clock.getBytecodesLeft() > 2000)
+            BFS(checkSpots.remove());
+    }
 
     public void checkPhase() throws GameActionException{
         if (phase == 1){
@@ -132,29 +143,6 @@ public class HQ extends Robot{
             msg[1] = START_PHASE_2;
             if(sendMessage(msg,DEFCON5))
                 phase++;
-        }
-    }
-    public void initBuildings() {
-        for (int i = -2; i <= 2; i++) {
-            System.out.println(HQ);
-            if (rc.onTheMap(HQ.translate(i, 5)))
-                buildings.add(HQ.translate(i, 5));
-            if (rc.onTheMap(HQ.translate(i, -5)))
-                buildings.add(HQ.translate(i, -5));
-            if (rc.onTheMap(HQ.translate(5, i)))
-                buildings.add(HQ.translate(5, i));
-            if (rc.onTheMap(HQ.translate(-5, i)))
-                buildings.add(HQ.translate(-5, i));
-        }
-        for (int i = -3; i <= 3; i++) {
-            if (rc.onTheMap(HQ.translate(i, 4)))
-                buildings.add(HQ.translate(i, 4));
-            if (rc.onTheMap(HQ.translate(i, -4)))
-                buildings.add(HQ.translate(i, -4));
-            if (rc.onTheMap(HQ.translate(4, i)))
-                buildings.add(HQ.translate(4, i));
-            if (rc.onTheMap(HQ.translate(-4, i)))
-                buildings.add(HQ.translate(-4, i));
         }
     }
 }

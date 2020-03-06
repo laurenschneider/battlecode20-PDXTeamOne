@@ -106,7 +106,6 @@ public class Landscaper extends Robot{
     public void takeTurn() throws GameActionException {
         for (; lastBlockRead < rc.getRoundNum(); lastBlockRead++)
             parseBlockchain(lastBlockRead);
-        System.out.println("DS: " + ds);
         if (rc.getLocation().distanceSquaredTo(HQ) < 100)
             defend();
         else
@@ -244,7 +243,7 @@ public class Landscaper extends Robot{
                         dump = d;
                 }
                 dumpSpots.removeAll(toRemove);
-                if (tryDeposit(current.directionTo(dump)))
+                if (dump != null && tryDeposit(current.directionTo(dump)))
                     return;
             }
             else if (!startDump && !innerSpots.contains(rc.getLocation())){

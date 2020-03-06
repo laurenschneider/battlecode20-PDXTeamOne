@@ -9,8 +9,8 @@ import static org.mockito.Mockito.mock;
 
 public class DesignSchoolTest {
     private RobotController rcMock = mock(RobotController.class);
-    DesignSchool testSchool = new DesignSchool(rcMock);
-
+ //   DesignSchool testSchool = new DesignSchool(rcMock);
+/*
     @Test
     public void takeTurnReturnWhenGreaterThanEight() throws GameActionException {
         testSchool.numLS = 8;
@@ -27,5 +27,5 @@ public class DesignSchoolTest {
 //        assertEquals(1,testSchool.numLS);
     }
 
-
+*/
 }

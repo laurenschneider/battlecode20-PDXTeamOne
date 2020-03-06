@@ -12,8 +12,8 @@ import static org.mockito.Mockito.mock;
 
 public class LandscaperTest {
     private RobotController rcMock = mock(RobotController.class);
-    Landscaper testLandscaper = new Landscaper(rcMock);
-
+    //Landscaper testLandscaper = new Landscaper(rcMock);
+/*
 
     public LandscaperTest() throws GameActionException {
     }
@@ -77,7 +77,7 @@ public class LandscaperTest {
         int res = testLandscaper.parseBlockchain();
         assertEquals(res, 2);
     }
-
+/*
     @Test
     public void testParseBlockChainTarget() throws GameActionException {
         int cost = 1;
@@ -95,7 +95,8 @@ public class LandscaperTest {
         int res = testLandscaper.parseBlockchain();
         assertEquals(res, 3);
     }
-
+    */
+/*
     @Test
     public void testAttackWithDirt() throws GameActionException {
         testLandscaper.enemyHQ = new MapLocation(0,1);
@@ -162,4 +163,5 @@ public class LandscaperTest {
         boolean res = testLandscaper.tryDig(Direction.EAST);
         assertFalse(res);
     }
+    */
 }

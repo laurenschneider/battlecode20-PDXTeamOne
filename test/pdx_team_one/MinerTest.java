@@ -5,16 +5,17 @@ import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 
 import static junit.framework.TestCase.*;
 
 public class MinerTest {
     RobotController rcMock = Mockito.mock(RobotController.class);
-    Miner testMiner = new Miner(rcMock) {};
+    Miner testMiner = new Miner(rcMock);
 
     public MinerTest() throws GameActionException {}
-
+/*
     @Test
     public void scoutTakeTurn() throws GameActionException{
         Mockito.doReturn(2).when(rcMock).getRoundNum();
@@ -28,7 +29,8 @@ public class MinerTest {
         Mockito.doReturn(true).when(rcMock).isReady();
         testMiner.takeTurn();
     }
-
+    */
+/*
     @Test
     public void minerTakeTurn() throws GameActionException{
         Mockito.doReturn(3).when(rcMock).getRoundNum();
@@ -108,28 +110,28 @@ public class MinerTest {
     }*/
 
 
-
+/*
     @Test
-    public void minerBuildDesignSchool() throws GameActionException{
-        testMiner.vaporators = 1;
+    public void builderDesignSchool() throws GameActionException{
         testMiner.builder = true;
         testMiner.design_school = false;
         testMiner.HQ = new MapLocation(50,50);
+        testMiner.vaporators = new ArrayDeque<>();
         Mockito.doReturn(new MapLocation(1, 1)).when(rcMock).getLocation();
         Mockito.doReturn(new RobotInfo[0]).when(rcMock).senseNearbyRobots();
         Mockito.doReturn(new MapLocation[0]).when(rcMock).senseNearbySoup();
         Mockito.doReturn(true).when(rcMock).canBuildRobot(RobotType.DESIGN_SCHOOL,Direction.SOUTHWEST);
         Mockito.doReturn(true).when(rcMock).isReady();
         Mockito.doReturn(new MapLocation(4,4)).when(rcMock).adjacentLocation(Direction.SOUTHWEST);
-        assertEquals(1,testMiner.doMinerThings());
+        assertEquals(3,testMiner.doBuilderThings());
     }
 
     @Test
-    public void minerBuildFulfillmentCenter() throws GameActionException{
-        testMiner.vaporators = 1;
+    public void builderFulfillmentCenter() throws GameActionException{
         testMiner.builder = true;
         testMiner.design_school = true;
         testMiner.fulfillment_center = false;
+        testMiner.vaporators = new ArrayDeque<>();
         RobotInfo[] r = new RobotInfo[2];
         testMiner.HQ = new MapLocation(50,50);
         Mockito.doReturn(new MapLocation(4, 4)).when(rcMock).getLocation();
@@ -140,9 +142,9 @@ public class MinerTest {
         Mockito.doReturn(true).when(rcMock).canBuildRobot(RobotType.FULFILLMENT_CENTER,Direction.SOUTHWEST);
         Mockito.doReturn(true).when(rcMock).isReady();
         Mockito.doReturn(new MapLocation(4,4)).when(rcMock).adjacentLocation(Direction.SOUTHWEST);
-        assertEquals(2,testMiner.doMinerThings());
-    }
-
+        assertEquals(4,testMiner.doBuilderThings());
+    }*/
+/*
     @Test
     public void minerSoupsUnderLimit() throws GameActionException{
         Mockito.doReturn(new RobotInfo[0]).when(rcMock).senseNearbyRobots();
@@ -257,33 +259,6 @@ public class MinerTest {
         assertEquals(0, res);
     }
 
-    @Test
-    public void parseBlockchainDesignSchoolBuilt() throws GameActionException {
-        int cost = 1;
-        int [] message = new int [5];
-        message[0] = 2222; message[1] = 2;
-        int id = 3;
-        Transaction t1 = new Transaction(cost,message,id);
-        Transaction [] t = new Transaction[1];
-        t[0] = t1;
-        Mockito.doReturn(t).when(rcMock).getBlock(0);
-        int res = testMiner.parseBlockchain(0);
-        assertEquals(1, res);
-    }
-
-    @Test
-    public void parseBlockchainFCenterBuilt() throws GameActionException {
-        int cost = 1;
-        int [] message = new int [5];
-        message[0] = 2222; message[1] = 6;
-        int id = 3;
-        Transaction t1 = new Transaction(cost,message,id);
-        Transaction [] t = new Transaction[1];
-        t[0] = t1;
-        Mockito.doReturn(t).when(rcMock).getBlock(0);
-        int res = testMiner.parseBlockchain(0);
-        assertEquals(2, res);
-    }
 
     @Test
     public void parseBlockchainHQLoc() throws GameActionException {
@@ -329,5 +304,5 @@ public class MinerTest {
         Mockito.doNothing().when(rcMock).depositSoup(dir,1);
         boolean res = testMiner.tryRefine(dir);
         assertTrue(res);
-    }
+    }*/
 }

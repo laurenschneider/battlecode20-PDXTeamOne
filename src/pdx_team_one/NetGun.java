@@ -7,9 +7,6 @@ public class NetGun extends Robot{
     }
 
     public void takeTurn() throws GameActionException{
-        for (RobotInfo r : rc.senseNearbyRobots()){
-            if (r.getTeam() != rc.getTeam() && rc.canShootUnit(r.ID))
-                rc.shootUnit(r.ID);
-        }
+        defense();
     }
 }

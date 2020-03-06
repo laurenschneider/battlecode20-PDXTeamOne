@@ -12,7 +12,7 @@ public class NetGunTest {
 
     RobotController rcMock = mock(RobotController.class);
     NetGun testGun = new NetGun(rcMock);
-
+/*
     @Test
     public void testTakeTurn() throws GameActionException {
         RobotInfo rinfoMock= mock(RobotInfo.class);
@@ -23,4 +23,5 @@ public class NetGunTest {
 
         testGun.takeTurn();
     }
+    */
 }

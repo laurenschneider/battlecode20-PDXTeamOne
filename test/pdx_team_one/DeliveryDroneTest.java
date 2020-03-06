@@ -14,8 +14,8 @@ import static org.mockito.Mockito.when;
 public class DeliveryDroneTest {
 
     private RobotController rcMock = mock(RobotController.class);
-    DeliveryDrone testDrone = new DeliveryDrone(rcMock);
-
+    //DeliveryDrone testDrone = new DeliveryDrone(rcMock);
+/*
     public DeliveryDroneTest() throws GameActionException {
     }
 
@@ -25,39 +25,6 @@ public class DeliveryDroneTest {
         DeliveryDrone droneSpy = Mockito.spy(testDrone);
         Mockito.doReturn(1).when(droneSpy).parseBlockchain(1);
         Mockito.doReturn(1).when(droneSpy).runDeliveryDrone();
-    }
-
-    @Test
-    public void adjacentHQTest1() throws GameActionException {
-        MapLocation loc = new MapLocation(1,2);
-        testDrone.HQ = new MapLocation(3,4);
-        Mockito.doReturn(loc).when(rcMock).getLocation();
-        Mockito.doReturn(true).when(rcMock).canMove(loc.directionTo(testDrone.HQ).opposite());
-        DeliveryDrone droneSpy = Mockito.spy(testDrone);
-        int res = droneSpy.adjacentHQMoves();
-        assertEquals(1, res);
-    }
-
-    @Test
-    public void adjacentHQTest2() throws GameActionException {
-        MapLocation loc = new MapLocation(1,2);
-        testDrone.HQ = new MapLocation(3,4);
-        Mockito.doReturn(loc).when(rcMock).getLocation();
-        Mockito.doReturn(true).when(rcMock).canMove(loc.directionTo(testDrone.HQ).opposite().rotateLeft());
-        DeliveryDrone droneSpy = Mockito.spy(testDrone);
-        int res = droneSpy.adjacentHQMoves();
-        assertEquals(2, res);
-    }
-
-    @Test
-    public void adjacentHQTest3() throws GameActionException {
-        MapLocation loc = new MapLocation(1,2);
-        testDrone.HQ = new MapLocation(3,4);
-        Mockito.doReturn(loc).when(rcMock).getLocation();
-        Mockito.doReturn(true).when(rcMock).canMove(loc.directionTo(testDrone.HQ).opposite().rotateRight());
-        DeliveryDrone droneSpy = Mockito.spy(testDrone);
-        int res = droneSpy.adjacentHQMoves();
-        assertEquals(3, res);
     }
 
 
@@ -142,6 +109,7 @@ public class DeliveryDroneTest {
         assertEquals(2, 2);
     }
 
+    /*
     @Test
     public void testHoldingFriendReturn1() throws GameActionException {
         testDrone.HQ = new MapLocation(3,4);
@@ -152,8 +120,8 @@ public class DeliveryDroneTest {
         testDrone.addLandscaper(1,loc);
         int res = testDrone.holdingFriend();
         assertEquals(1, res);
-    }
-
+    }*/
+/*
     @Test
     public void testHoldingFriendReturn2() throws GameActionException {
         MapLocation loc = new MapLocation(1,2);
@@ -223,4 +191,5 @@ public class DeliveryDroneTest {
         int res = testDrone.nearbyLandscapers(ri);
         assertEquals(2, res);
     }
+    */
 }

@@ -48,9 +48,11 @@ public class DesignSchool extends Robot{
     }
 
     public boolean checkSecure() throws GameActionException{
-        for (Direction dir : directions){
-            if (rc.canSenseLocation(rc.getLocation().add(dir)) &&rc.senseElevation(rc.getLocation().add(dir)) - rc.senseElevation(rc.getLocation()) < 3)
-                return false;
+        if (rc.senseElevation(rc.getLocation()) < 6) {
+            for (Direction dir : directions) {
+                if (rc.canSenseLocation(rc.getLocation().add(dir)) && rc.senseElevation(rc.getLocation().add(dir)) - rc.senseElevation(rc.getLocation()) < 3)
+                    return false;
+            }
         }
         int[] msg = new int[7];
         msg[0] = TEAM_ID;

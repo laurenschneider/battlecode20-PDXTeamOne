@@ -2,14 +2,13 @@ package pdx_team_one;
 import battlecode.common.*;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 
 public class DeliveryDrone extends Robot{
 
-    private int PICKUP = 1;
-    private int DROPOFF = 0;
-    private HashMap<Integer, MapLocation[]> friends = new HashMap<>();
+    private HashMap<Integer, MapLocation> friends = new HashMap<>();
     private HashSet<MapLocation> water = new HashSet<>();
     private RobotInfo holding;
     private static Direction path = Direction.NORTH;
@@ -19,6 +18,7 @@ public class DeliveryDrone extends Robot{
     private ArrayDeque<MapLocation> innerSpots = new ArrayDeque<>();
     private ArrayDeque<MapLocation> wallSpots = new ArrayDeque<>();
     private ArrayDeque<MapLocation> outerSpots = new ArrayDeque<>();
+    private ArrayList<MapLocation> blockSoups = new ArrayList<>();
 
     DeliveryDrone(RobotController r) throws GameActionException
     {
@@ -49,14 +49,26 @@ public class DeliveryDrone extends Robot{
             for (Direction dir : directions)
                 outerSpots.add(HQ.add(dir).add(dir).add(dir.rotateLeft()));
         }
+        ArrayList<MapLocation> toRemove = new ArrayList<>();
+        for (MapLocation m : wallSpots) {
+            if (!rc.onTheMap(m))
+                toRemove.add(m);
+        }
+        for (MapLocation m : outerSpots) {
+            if (!rc.onTheMap(m))
+                toRemove.add(m);
+        }
+        wallSpots.removeAll(toRemove);
+        outerSpots.removeAll(toRemove);
     }
 
     public void takeTurn() throws GameActionException {
         for (; lastBlockRead < rc.getRoundNum(); lastBlockRead++)
             parseBlockchain(lastBlockRead);
-        parseBlockchain(rc.getRoundNum()-1);
+        scanSoup();
         if (rc.isReady()) {
             if (rc.isCurrentlyHoldingUnit()) {
+                System.out.println("I am holding a unit!");
                 if (holding.team == rc.getTeam())
                     deliverFriend();
                 else
@@ -66,9 +78,35 @@ public class DeliveryDrone extends Robot{
         }
     }
 
+    public void scanSoup() throws GameActionException{
+        MapLocation[] soups = rc.senseNearbySoup();
+        ArrayList<MapLocation> toRemove = new ArrayList<>();
+        if (soups.length > 0) {
+            ArrayList<MapLocation> newSoup = new ArrayList<>();
+            for (MapLocation soup : soups) {
+                if (rc.senseFlooding(soup))
+                    toRemove.add(soup);
+                else if (!blockSoups.contains(soup))
+                    newSoup.add(soup);
+            }
+            if (!newSoup.isEmpty())
+                broadcastSoup(newSoup.toArray(new MapLocation[0]));
+        }/*
+        else{
+            for (MapLocation soup : blockSoups){
+                if (rc.canSenseLocation(soup))
+                    toRemove.add(soup);
+            }
+        }*/
+        blockSoups.removeAll(toRemove);
+        System.out.println(Clock.getBytecodesLeft());
+        return;
+    }
+
      boolean deliverLS(ArrayDeque<MapLocation> spots) throws GameActionException{
         ArrayDeque<MapLocation> toRemove = new ArrayDeque<>();
         for (MapLocation m : spots) {
+            System.out.println("Maybe my friend wants to go to " + m);
             if (rc.canSenseLocation(m)) {
                 RobotInfo r = rc.senseRobotAtLocation(m);
                 if (r != null && r.type == RobotType.LANDSCAPER)
@@ -89,6 +127,8 @@ public class DeliveryDrone extends Robot{
                 for (Direction dir : directions)
                     tryMove(dir);
             }
+            System.out.println("Carrying friend to " + target);
+            System.out.println(Clock.getBytecodesLeft() + "  " + rc.isReady());
             pathTo(target);
             return true;
         }
@@ -104,43 +144,23 @@ public class DeliveryDrone extends Robot{
             if (!outerSpots.isEmpty() && deliverLS(outerSpots))
                 return 2;
             return 3;
-        }
-        System.out.println("I have a friend and he needs to get to " + friends.get(holding.ID)[DROPOFF]);
-        int res = 0;
-        if (rc.getLocation().equals(friends.get(holding.ID)[DROPOFF])){
-            for (Direction dir : directions)
-                tryMove(dir);
-        }
-        else if (rc.getLocation().isAdjacentTo(friends.get(holding.ID)[DROPOFF])) {
-            //todo: what if everywhere is flooded?
-            if (rc.senseFlooding(friends.get(holding.ID)[DROPOFF])){
-                for (Direction dir : directions){
-                    if (rc.senseFlooding(rc.getLocation().add(dir)))
-                        continue;
-                    if(rc.canDropUnit(dir)) {
-                        rc.dropUnit(dir);
-                        friends.remove(holding.ID);
-                        holding = null;
-                        return 1;
-                    }
+        } else {
+            ArrayList<MapLocation> toRemove = new ArrayList<>();
+            for (MapLocation m : blockSoups) {
+                if(rc.canSenseLocation(m) && rc.senseSoup(m) == 0)
+                    toRemove.add(m);
+                else if (!rc.getLocation().equals(m) && rc.getLocation().isAdjacentTo(m) && rc.canDropUnit(rc.getLocation().directionTo(m))) {
+                    rc.dropUnit(rc.getLocation().directionTo(m));
+                    return 4;
                 }
             }
-            else if (rc.canDropUnit(rc.getLocation().directionTo(friends.get(holding.ID)[DROPOFF]))) {
-                rc.dropUnit(rc.getLocation().directionTo(friends.get(holding.ID)[DROPOFF]));
-                friends.remove(holding.ID);
-                holding = null;
-            }
-            else{
-                for (Direction dir : directions)
-                    tryMove(dir);
-            }
-            res = 1;
+            blockSoups.removeAll(toRemove);
+            if (blockSoups.isEmpty())
+                scout();
+            else
+                pathTo(closestLocation(blockSoups.toArray(new MapLocation[0])));
+            return 5;
         }
-        else {
-            pathTo(friends.get(holding.ID)[DROPOFF]);
-            res = 2;
-        }
-        return res;
     }
 
 
@@ -158,15 +178,17 @@ public class DeliveryDrone extends Robot{
                     //} else if (t.getMessage()[1] == HQ_TARGET_ACQUIRED) {
                     //  friends.put(t.getMessage()[4], new MapLocation[]{new MapLocation(t.getMessage()[2], t.getMessage()[3]), new MapLocation(t.getMessage()[5], t.getMessage()[6])});
                 } else if (t.getMessage()[1] == NEED_DELIVERY) {
-                    friends.put(t.getMessage()[4], new MapLocation[]{new MapLocation(t.getMessage()[2], t.getMessage()[3]), new MapLocation(t.getMessage()[5], t.getMessage()[6])});
-                    System.out.println("Incoming message! Friend " + t.getMessage()[4] + " needs to go to " + friends.get(t.getMessage()[4])[DROPOFF]);
-                    System.out.println("He's located at " + friends.get(t.getMessage()[4])[PICKUP]);
+                    friends.put(t.getMessage()[4], new MapLocation(t.getMessage()[5], t.getMessage()[6]));
+                    System.out.println("Incoming message! Friend " + t.getMessage()[4] + " is located at " + friends.get(t.getMessage()[4]));
                 } else if (t.getMessage()[1] == DS_SECURE)
                     ds_secure = true;
                 else if (t.getMessage()[1] == ATTACK)
                     attackStrat = true;
                 else if (t.getMessage()[1] == DEFENSE) {
                     home = new MapLocation(t.getMessage()[4],t.getMessage()[5]);
+                } else if (t.getMessage()[1] == SOUPS_FOUND) {
+                    for (int j = 2; j < 7 && t.getMessage()[j] != 0; j++)
+                        blockSoups.add(new MapLocation(t.getMessage()[j] / 100, t.getMessage()[j] % 100));
                 }
             }
         }
@@ -180,6 +202,8 @@ public class DeliveryDrone extends Robot{
                 System.out.println("Picking up " + r.ID);
                 holding = r;
                 rc.pickUpUnit(r.ID);
+                if (friends.containsKey(r.ID))
+                    friends.remove(r.ID);
                 return 1;
             }
         }
@@ -187,7 +211,8 @@ public class DeliveryDrone extends Robot{
         return 0;
     }
 
-    public int findSomethingToDo() throws GameActionException {
+    public MapLocation nearestEnemy() throws GameActionException{
+        System.out.println("Checking for enemies");
         for (RobotInfo r : rc.senseNearbyRobots(-1,rc.getTeam().opponent())) {
             if (enemyNG == null && r.type == RobotType.NET_GUN ) {
                 enemyNG = r.location;
@@ -209,51 +234,84 @@ public class DeliveryDrone extends Robot{
                 sendMessage(msg, DEFCON1);
             }
             else if (r.type == RobotType.LANDSCAPER || r.type == RobotType.MINER)
-                return pickupUnit(r.location);
+                return r.location;
         }
+        return null;
+    }
+
+    public MapLocation nearestFriendInNeed(){
+        System.out.println("Checking for friends");
         MapLocation target = null;
-        for (RobotInfo r : rc.senseNearbyRobots(-1,rc.getTeam())){
-            if (friends.containsKey(r.ID)){
-                if (friends.get(r.ID)[DROPOFF].equals(r.location))
+        for (RobotInfo r : rc.senseNearbyRobots(-1,rc.getTeam())) {
+            if (friends.containsKey(r.ID)) {
+                if (friends.get(r.ID).equals(r.location)) {
+                    if (target == null)
+                        target = r.location;
+                    else
+                        target = closestLocation(new MapLocation[]{target, r.location});
+                }
+                else
                     friends.remove(r.ID);
-                else if (target == null)
-                    target = r.location;
-                else
-                    target = closestLocation(new MapLocation[]{target, r.location});
-            }
-            else if (ds_secure && r.type == RobotType.LANDSCAPER && (r.location.distanceSquaredTo(HQ) > 13 && r.location.distanceSquaredTo(HQ) != 18)) {
-                if (target==null)
-                    target = r.location;
-                else
-                    target = closestLocation(new MapLocation[]{target,r.location});
+            } else if (ds_secure && r.type == RobotType.LANDSCAPER) {
+                if (!innerSpots.isEmpty()) {
+                    boolean pickup = true;
+                    for (Direction dir : corners){
+                        if (r.location.equals(HQ.add(dir)))
+                            pickup = false;
+                    }
+                    if (pickup)
+                        return r.location;
+                }
+                if (r.location.distanceSquaredTo(HQ) > 13 && r.location.distanceSquaredTo(HQ) != 18) {
+                    if (target == null)
+                        target = r.location;
+                    else
+                        target = closestLocation(new MapLocation[]{target, r.location});
+                }
             }
         }
+        return target;
+    }
+
+    public MapLocation findACow(){
+        System.out.println("Checking for cows");
+        ArrayList <MapLocation> cow = new ArrayList<>();
+        for (RobotInfo r : rc.senseNearbyRobots(-1,Team.NEUTRAL)){
+            cow.add(r.location);
+        }
+        if (cow.isEmpty())
+            return null;
+        return closestLocation(cow.toArray(new MapLocation[0]));
+    }
+
+    public int findSomethingToDo() throws GameActionException {
+        MapLocation target = nearestEnemy();
+        if (target == null)
+            target = nearestFriendInNeed();
+        if (target == null)
+            target = findACow();
         if (target != null)
             return pickupUnit(target);
-        else if (friends.isEmpty()) {
-            if (rc.getLocation().distanceSquaredTo(home) < 10)
-                scout();
-            else
-                pathTo(home);
-            return 666;
+        if (rc.getCurrentSensorRadiusSquared() <= 1) {
+            for (Direction dir : directions)
+                tryMove(dir);
+            return 2435;
         }
-        else {
-            for (int id : friends.keySet()) {
-                if (ds_secure && rc.getLocation().equals(friends.get(id)[PICKUP]))
-                    friends.remove(id);
-                else if (target == null)
-                    target = friends.get(id)[PICKUP];
-                else
-                    target = closestLocation(new MapLocation[]{friends.get(id)[PICKUP],target});
+        if (!friends.isEmpty()) {
+            for (int key : friends.keySet()) {
+                if (rc.canSenseLocation(friends.get(key)))
+                    friends.remove(key);
             }
-            if (target != null)
-                pathTo(target);
-            else if (rc.getLocation().distanceSquaredTo(home) < 10)
-                scout();
-            else
-                pathTo(home);
+            if (!friends.isEmpty()) {
+                pathTo(closestLocation(friends.values().toArray(new MapLocation[0])));
+                return 253452345;
+            }
         }
-        return 0;
+        if (rc.getLocation().distanceSquaredTo(home) < 10)
+            scout();
+        else
+            pathTo(home);
+        return 666;
     }
 
     public int scout() throws GameActionException{

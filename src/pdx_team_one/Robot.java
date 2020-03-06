@@ -228,4 +228,14 @@ public abstract class Robot {
         }
         return ret;
     }
+    //broadcast undiscovered soup locations
+    public boolean broadcastSoup(MapLocation[] soups) throws GameActionException {
+        int[] msg = new int[7];
+        msg[0] = TEAM_ID;
+        msg[1] = SOUPS_FOUND;
+        int i;
+        for (i = 0; i < soups.length && i < 5; i++)
+            msg[i+2] = 100*soups[i].x + soups[i].y;
+        return sendMessage(msg, DEFCON5);
+    }
 }

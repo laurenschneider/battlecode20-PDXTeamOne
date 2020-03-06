@@ -1,7 +1,7 @@
 package pdx_team_one;
 import battlecode.common.*;
 
-import java.util.ArrayList;
+import java.util.HashSet;
 
 public class HQ extends Robot{
 
@@ -11,7 +11,7 @@ public class HQ extends Robot{
     private boolean strategy;
     private boolean locationSent;
     int phase = 1;
-    ArrayList<MapLocation> buildings = new ArrayList<>();
+    HashSet<MapLocation> buildings = new HashSet<>();
 
     HQ(RobotController r) throws GameActionException{
         super(r);
@@ -20,10 +20,12 @@ public class HQ extends Robot{
     }
 
     public void takeTurn() throws GameActionException {
-        if (!locationSent)
+        if (!locationSent) {
             locationSent = sendLocation();
-        else if (!strategy)
             strategy = determineStrategy();
+            MapLocation[] soups = rc.senseNearbySoup();
+            broadcastSoup(soups);
+        }
         defense();
         if (numMiners < maxMiners)
             numMiners = buildMiners();
@@ -53,10 +55,15 @@ public class HQ extends Robot{
         return numMiners;
     }
 
-    public boolean determineStrategy()throws GameActionException{
+    public boolean determineStrategy()throws GameActionException {
         int soup = 0;
-        for (MapLocation m: rc.senseNearbySoup())
+        for (MapLocation m : rc.senseNearbySoup())
             soup += rc.senseSoup(m);
+        maxMiners = soup / 300;
+        if (maxMiners < 3)
+            maxMiners = 3;
+        if (maxMiners > 6)
+            maxMiners = 6;
         /*if (soup < 2000){
             System.out.println("Not enough soup");
             int[] msg = new int[7];
@@ -69,17 +76,14 @@ public class HQ extends Robot{
         MapLocation fc = null,ds = null;
         for (MapLocation m : buildings){
             if (evaluate(m)) {
-                //if (fc == null)
-                  //  fc = m;
-                //else if (m.distanceSquaredTo(fc) <=9 && !m.isAdjacentTo(fc)) {
                     ds = m;
                     break;
-               // }
             }
         }
 
         if (ds == null) {
             System.out.println("No suitable locations");
+            rc.resign();
             int[] msg = new int[7];
             msg[0] = TEAM_ID;
             msg[1] = ATTACK;
@@ -114,20 +118,6 @@ public class HQ extends Robot{
         return (spots >= 4);
     }
 
-    public void initBuildings(){
-        for (int i = -2; i <= 2; i++) {
-            buildings.add(HQ.translate(i, 5));
-            buildings.add(HQ.translate(i, -5));
-            buildings.add(HQ.translate(5, i));
-            buildings.add(HQ.translate(-5, i));
-        }
-        for (int i = -3; i <= 3; i++) {
-            buildings.add(HQ.translate(i, 4));
-            buildings.add(HQ.translate(i, -4));
-            buildings.add(HQ.translate(4, i));
-            buildings.add(HQ.translate(-4, i));
-        }
-    }
 
     public void checkPhase() throws GameActionException{
         if (phase == 1){
@@ -142,6 +132,29 @@ public class HQ extends Robot{
             msg[1] = START_PHASE_2;
             if(sendMessage(msg,DEFCON5))
                 phase++;
+        }
+    }
+    public void initBuildings() {
+        for (int i = -2; i <= 2; i++) {
+            System.out.println(HQ);
+            if (rc.onTheMap(HQ.translate(i, 5)))
+                buildings.add(HQ.translate(i, 5));
+            if (rc.onTheMap(HQ.translate(i, -5)))
+                buildings.add(HQ.translate(i, -5));
+            if (rc.onTheMap(HQ.translate(5, i)))
+                buildings.add(HQ.translate(5, i));
+            if (rc.onTheMap(HQ.translate(-5, i)))
+                buildings.add(HQ.translate(-5, i));
+        }
+        for (int i = -3; i <= 3; i++) {
+            if (rc.onTheMap(HQ.translate(i, 4)))
+                buildings.add(HQ.translate(i, 4));
+            if (rc.onTheMap(HQ.translate(i, -4)))
+                buildings.add(HQ.translate(i, -4));
+            if (rc.onTheMap(HQ.translate(4, i)))
+                buildings.add(HQ.translate(4, i));
+            if (rc.onTheMap(HQ.translate(-4, i)))
+                buildings.add(HQ.translate(-4, i));
         }
     }
 }

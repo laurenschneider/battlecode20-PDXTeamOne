@@ -3,7 +3,7 @@ import battlecode.common.*;
 
 public class DesignSchool extends Robot{
     int numLS = 0;
-    int maxLS = 4;
+    int maxLS = 1;
     private boolean secure;
     DesignSchool(RobotController r) throws GameActionException{
         super(r);
@@ -36,12 +36,10 @@ public class DesignSchool extends Robot{
         int res = 0;
         for (Transaction t : rc.getBlock(round)) {
             if (t.getMessage()[0] == TEAM_ID) {
-                if (t.getMessage()[1] == ATTACK)
-                    maxLS = 40;
-                else if (t.getMessage()[1] == DEFENSE)
-                    maxLS = 4;
+                if (t.getMessage()[1] == DEFENSE)
+                    maxLS = 1;
                 else if (t.getMessage()[1] == START_PHASE_2)
-                    maxLS = 1000000;
+                    maxLS = 100000;
             }
         }
         return res;

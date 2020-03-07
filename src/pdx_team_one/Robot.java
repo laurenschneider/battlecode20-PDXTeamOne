@@ -21,6 +21,8 @@ public abstract class Robot {
     static final int DS_SECURE = 11;
     static final int START_PHASE_2 = 12;
     static final int NEED_DELIVERY = 13;
+    static final int INNER_SPOTS_FILLED = 14;
+    static final int WALL_SPOTS_FILLED = 15;
 
     //message importance
     //HQ location

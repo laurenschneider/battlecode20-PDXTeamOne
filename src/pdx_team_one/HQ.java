@@ -8,20 +8,25 @@ public class HQ extends Robot{
 
     int numMiners = 0;
     int maxMiners = 6;
-    private boolean attack;
     private boolean strategy;
     private boolean locationSent;
     private boolean[][] visited = new boolean[rc.getMapWidth()][rc.getMapHeight()];
     private HashSet<MapLocation> dsSpots = new HashSet<>();
+    private HashSet<MapLocation> fcSpots = new HashSet<>();
+    private HashSet<MapLocation> innerSpots = new HashSet<>();
+    private HashSet<MapLocation> wallSpots = new HashSet<>();
+    int DSelevation = -100000;
     private ArrayDeque<Node> checkSpots = new ArrayDeque<>();
     int phase = 1;
 
     class Node{
         int moves;
         MapLocation loc;
-        Node(int m, MapLocation l){
+        int elevation;
+        Node(int m, MapLocation l) throws GameActionException{
             moves = m;
             loc = l;
+            elevation = rc.senseElevation(l);
         }
     }
 
@@ -30,6 +35,12 @@ public class HQ extends Robot{
         HQ = rc.getLocation();
         visited[HQ.x][HQ.y] = true;
         checkSpots.add(new Node(0,HQ));
+        for (Direction dir : corners)
+            innerSpots.add(HQ.add(dir));
+        for (Direction dir : directions){
+            wallSpots.add(HQ.add(dir).add(dir));
+            wallSpots.add(HQ.add(dir).add(dir.rotateRight()));
+        }
     }
 
     public void takeTurn() throws GameActionException {
@@ -44,32 +55,55 @@ public class HQ extends Robot{
         if (!checkSpots.isEmpty())
             BFS(checkSpots.remove());
         else if (!strategy && Clock.getBytecodesLeft() > 15000){
-            MapLocation target = null;
+            System.out.println("Starting with " + Clock.getBytecodesLeft());
+            MapLocation[] corners = new MapLocation[4];
+            corners[0] = new MapLocation(0,0);
+            corners[1] = new MapLocation(0,rc.getMapHeight());
+            corners[2] = new MapLocation(rc.getMapWidth(),0);
+            corners[3] = new MapLocation(rc.getMapWidth(),rc.getMapHeight());
+
+            MapLocation corner = closestLocation(corners);
+            MapLocation ds = null, fc = null;
             for (MapLocation m : dsSpots){
-                if (target == null)
-                    target = m;
-                else if (rc.senseElevation(m) > rc.senseElevation(target))
-                    target = m;
+                if (ds == null)
+                    ds = m;
+                else if (fc == null)
+                    fc = m;
+                else if (m.distanceSquaredTo(corner) < ds.distanceSquaredTo(corner)) {
+                    fc = ds;
+                    ds = m;
+                }
+                else if (m.distanceSquaredTo(corner) < fc.distanceSquaredTo(corner)){
+                    fc = m;
+                }
             }
-            if (target != null) {
+            if (fc == null){
+                for (MapLocation m : fcSpots) {
+                    if (fc == null)
+                        fc = m;
+                    else if (m.distanceSquaredTo(corner) < fc.distanceSquaredTo(corner))
+                        fc = m;
+                }
+            }
+            if (fc != null) {
                 int[] msg = new int[7];
                 msg[0] = TEAM_ID;
                 msg[1] = DEFENSE;
-                msg[2] = 0;//fc.x;
-                msg[3] = 0;//fc.y;
-                msg[4] = target.x;
-                msg[5] = target.y;
+                msg[2] = fc.x;
+                msg[3] = fc.y;
+                msg[4] = ds.x;
+                msg[5] = ds.y;
                 sendMessage(msg, DEFCON5);
-                System.out.println("DS: " + target);
+                System.out.println("DS: " + ds);
             }
             else{
                 System.out.println("No suitable Locations");
                 rc.resign();
             }
             strategy = true;
+            System.out.println("Ending with " + Clock.getBytecodesLeft());
         }
-        else if (!attack)
-            checkPhase();
+        checkPhase();
     }
 
     public boolean sendLocation() throws GameActionException {
@@ -114,8 +148,17 @@ public class HQ extends Robot{
 
     public void BFS(Node m) throws GameActionException{
         if (m.moves <= 6) {
-            if (evaluate(m.loc))
-                dsSpots.add(m.loc);
+            if (evaluate(m.loc)) {
+                if (m.elevation == DSelevation)
+                    dsSpots.add(m.loc);
+                else if (m.elevation > DSelevation){
+                    fcSpots.clear();
+                    fcSpots.addAll(dsSpots);
+                    dsSpots.clear();
+                    dsSpots.add(m.loc);
+                    DSelevation = m.elevation;
+                }
+            }
             for (Direction dir : directions) {
                 MapLocation check = m.loc.add(dir);
                 if (rc.onTheMap(check) && rc.canSenseLocation(check) && !visited[check.x][check.y]) {
@@ -141,6 +184,32 @@ public class HQ extends Robot{
             int[] msg = new int[7];
             msg[0] = TEAM_ID;
             msg[1] = START_PHASE_2;
+            if(sendMessage(msg,DEFCON5))
+                phase++;
+        }
+        if (phase == 2){
+            for (MapLocation m : innerSpots){
+                RobotInfo r = rc.senseRobotAtLocation(m);
+                if (r== null || r.type!= RobotType.LANDSCAPER)
+                    return;
+            }
+            System.out.println("Inner Spots filled");
+            int[] msg = new int[7];
+            msg[0] = TEAM_ID;
+            msg[1] = INNER_SPOTS_FILLED;
+            if(sendMessage(msg,DEFCON5))
+                phase++;
+        }
+        else if (phase == 3){
+            for (MapLocation m : wallSpots){
+                RobotInfo r = rc.senseRobotAtLocation(m);
+                if (r == null || r.type != RobotType.LANDSCAPER)
+                    return;
+            }
+            System.out.println("Wall Spots filled");
+            int[] msg = new int[7];
+            msg[0] = TEAM_ID;
+            msg[1] = WALL_SPOTS_FILLED;
             if(sendMessage(msg,DEFCON5))
                 phase++;
         }

@@ -194,7 +194,7 @@ public class Miner extends Robot {
                     fc = HQ.add(Direction.NORTH);
                     ds = HQ.add(Direction.SOUTH);
                 } else if (t.getMessage()[1] == DEFENSE) {
-                    //fc = new MapLocation(t.getMessage()[2],t.getMessage()[3]);
+                    fc = new MapLocation(t.getMessage()[2],t.getMessage()[3]);
                     ds = new MapLocation(t.getMessage()[4], t.getMessage()[5]);
                 } else if (t.getMessage()[1] == START_PHASE_2) {
                     refineries.remove(HQ);
@@ -205,21 +205,27 @@ public class Miner extends Robot {
     }
 
     private boolean buildRefinery() throws GameActionException {
+        Direction target = Direction.NORTH;
         for (Direction dir : directions) {
-            if (tryBuild(RobotType.REFINERY, dir)) {
-                for (RobotInfo r : rc.senseNearbyRobots()) {
-                    if (r.type == RobotType.REFINERY && !refineries.contains(r.location))
-                        refineries.add(r.location);
-                }
-                int[] msg = new int[7];
-                msg[0] = TEAM_ID;
-                msg[1] = REFINERY_BUILT;
-                msg[2] = rc.getLocation().add(dir).x;
-                msg[3] = rc.getLocation().add(dir).y;
-                sendMessage(msg, DEFCON4);
-                return true;
+            if (rc.canBuildRobot(RobotType.REFINERY, dir)) {
+                if (rc.senseElevation(rc.getLocation().add(dir)) > rc.senseElevation(rc.getLocation().add(target)))
+                    target = dir;
             }
         }
+        if (tryBuild(RobotType.REFINERY, target)) {
+            for (RobotInfo r : rc.senseNearbyRobots()) {
+                if (r.type == RobotType.REFINERY && !refineries.contains(r.location))
+                    refineries.add(r.location);
+            }
+            int[] msg = new int[7];
+            msg[0] = TEAM_ID;
+            msg[1] = REFINERY_BUILT;
+            msg[2] = rc.getLocation().add(target).x;
+            msg[3] = rc.getLocation().add(target).y;
+            sendMessage(msg, DEFCON4);
+            return true;
+        }
+
         return false;
     }
 
@@ -268,7 +274,24 @@ public class Miner extends Robot {
     }
 
     private boolean buildFulfillmentCenter() throws GameActionException {
-        for (Direction dir : directions) {
+        if (rc.getLocation().equals(fc)) {
+            for (Direction dir : directions)
+                tryMove(dir);
+        }
+        if (rc.canSenseLocation(fc) && rc.getLocation().isAdjacentTo(fc)) {
+            if (tryBuild(RobotType.FULFILLMENT_CENTER, rc.getLocation().directionTo(fc))) {
+                fulfillment_center = true;
+                return true;
+            } else {
+                for (Direction dir : directions)
+                    tryMove(dir);
+            }
+        } else
+            pathTo(fc);
+        return false;
+
+
+        /*for (Direction dir : directions) {
             MapLocation fc = rc.getLocation().add(dir);
             if (!rc.onTheMap(fc))
                 continue;
@@ -288,7 +311,7 @@ public class Miner extends Robot {
             tryMove(dir);
             dir = dir.rotateLeft();
         }
-        return false;
+        return false;*/
     }
 
     private boolean buildNetGun() throws GameActionException {

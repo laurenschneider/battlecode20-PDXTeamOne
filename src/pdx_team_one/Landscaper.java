@@ -20,9 +20,9 @@ public class Landscaper extends Robot{
     public int dsElevation;
     int outerWallHeight = 100;
 
-    Landscaper(RobotController r) throws GameActionException{
+    Landscaper(RobotController r) throws GameActionException {
         super(r);
-        for (RobotInfo ri : rc.senseNearbyRobots(-1,rc.getTeam())){
+        for (RobotInfo ri : rc.senseNearbyRobots(-1, rc.getTeam())) {
             if (ri.type == RobotType.DESIGN_SCHOOL) {
                 dsElevation = rc.senseElevation(ri.location);
                 ds = ri.location;
@@ -30,60 +30,51 @@ public class Landscaper extends Robot{
         }
         for (; lastBlockRead < rc.getRoundNum(); lastBlockRead++)
             parseBlockchain(lastBlockRead);
-        if (attackStrat) {
-            for (Direction dir : directions)
-                dumpSpots.add(HQ.add(dir).add(dir).add(dir));
-            for (Direction dir : directions)
-                dumpSpots.add(HQ.add(dir).add(dir).add(dir.rotateRight()));
-            for (Direction dir : directions)
-                dumpSpots.add(HQ.add(dir).add(dir).add(dir.rotateLeft()));
-            landSpots.addAll(dumpSpots);
-            digSpots.add(HQ.add(Direction.EAST));
-            digSpots.add(HQ.add(Direction.WEST));
+        for (Direction dir : corners) {
+            innerSpots.add(HQ.add(dir));
+            landSpots.add(HQ.add(dir));
+            digSpots.add(HQ.add(dir));
+            firstDump.add(HQ.add(dir.rotateRight()));
         }
-        else{
-            for (Direction dir : corners) {
-                innerSpots.add(HQ.add(dir));
-                landSpots.add(HQ.add(dir));
-                digSpots.add(HQ.add(dir));
-                firstDump.add(HQ.add(dir.rotateRight()));
+        for (Direction dir : directions) {
+            if (rc.onTheMap(ds.add(dir)) && !fc.equals(ds.add(dir)))
+                dsdumpSpots.add(ds.add(dir));
+            if(fc.isAdjacentTo(ds)) {
+                if (rc.onTheMap(fc.add(dir)) && !ds.equals(fc.add(dir)))
+                    dsdumpSpots.add(fc.add(dir));
             }
-            for (Direction dir : directions){
-                if(rc.onTheMap(ds.add(dir)))
-                    dsdumpSpots.add(ds.add(dir));
-                if(rc.onTheMap(ds.add(dir).add(dir)))
-                    digSpots.add(ds.add(dir).add(dir));
-                if(rc.onTheMap(ds.add(dir).add(dir.rotateRight())))
-                    digSpots.add(ds.add(dir).add(dir.rotateRight()));
-                if (rc.onTheMap(HQ.add(dir).add(dir))) {
-                    dumpSpots.add(HQ.add(dir).add(dir));
-                    firstDump.add(HQ.add(dir).add(dir));
-                }
-                if (rc.onTheMap(HQ.add(dir).add(dir.rotateRight())))
-                    firstDump.add(HQ.add(dir).add(dir.rotateRight()));
+            if (rc.onTheMap(ds.add(dir).add(dir)))
+                digSpots.add(ds.add(dir).add(dir));
+            if (rc.onTheMap(ds.add(dir).add(dir.rotateRight())))
+                digSpots.add(ds.add(dir).add(dir.rotateRight()));
+            if (rc.onTheMap(HQ.add(dir).add(dir))) {
+                dumpSpots.add(HQ.add(dir).add(dir));
+                firstDump.add(HQ.add(dir).add(dir));
             }
-            for (Direction dir : directions){
-                if (rc.onTheMap(HQ.add(dir).add(dir.rotateRight())))
-                    dumpSpots.add(HQ.add(dir).add(dir.rotateRight()));
-            }
+            if (rc.onTheMap(HQ.add(dir).add(dir.rotateRight())))
+                firstDump.add(HQ.add(dir).add(dir.rotateRight()));
+        }
+        for (Direction dir : directions) {
+            if (rc.onTheMap(HQ.add(dir).add(dir.rotateRight())))
+                dumpSpots.add(HQ.add(dir).add(dir.rotateRight()));
+        }
 
-            landSpots.addAll(dumpSpots);
-            for (Direction dir : directions) {
-                MapLocation m = HQ.add(dir).add(dir).add(dir);
-                if (rc.onTheMap(m)) {
-                    dumpSpots.add(m);
-                    landSpots.add(m);
-                }
-                m = HQ.add(dir).add(dir).add(dir.rotateRight());
-                if (rc.onTheMap(m)) {
-                    dumpSpots.add(m);
-                    landSpots.add(m);
-                }
-                m = HQ.add(dir).add(dir).add(dir.rotateLeft());
-                if (rc.onTheMap(m)) {
-                    dumpSpots.add(m);
-                    landSpots.add(m);
-                }
+        landSpots.addAll(dumpSpots);
+        for (Direction dir : directions) {
+            MapLocation m = HQ.add(dir).add(dir).add(dir);
+            if (rc.onTheMap(m)) {
+                dumpSpots.add(m);
+                landSpots.add(m);
+            }
+            m = HQ.add(dir).add(dir).add(dir.rotateRight());
+            if (rc.onTheMap(m)) {
+                dumpSpots.add(m);
+                landSpots.add(m);
+            }
+            m = HQ.add(dir).add(dir).add(dir.rotateLeft());
+            if (rc.onTheMap(m)) {
+                dumpSpots.add(m);
+                landSpots.add(m);
             }
         }
         for (int i = -4; i < 4; i++) {
@@ -96,9 +87,16 @@ public class Landscaper extends Robot{
             if (rc.onTheMap(HQ.translate(-4, i)))
                 digSpots.add(HQ.translate(-4, i));
         }
+        for (Direction dir : directions) {
+            if (rc.onTheMap(fc.add(dir)) && !fc.add(dir).equals(ds)) {
+                dsdumpSpots.remove(fc);
+                digSpots.remove(fc.add(dir));
+            }
+        }
+        digSpots.remove(fc);
+        digSpots.remove(ds);
         digSpots.removeAll(dumpSpots);
         digSpots.removeAll(dsdumpSpots);
-        digSpots.remove(ds);
         target = landSpots.get(0);
     }
 
@@ -165,28 +163,8 @@ public class Landscaper extends Robot{
             return;
         MapLocation current = rc.getLocation();
         if (!landSpots.contains(current)) {
-            if (attackStrat) {
-                target = closestLocation(landSpots.toArray(new MapLocation[0]));
-                if (rc.senseFlooding(target)) {
-                    if (current.isAdjacentTo(target)) {
-                        if (rc.getDirtCarrying() > 0)
-                            tryDeposit(current.directionTo(target));
-                        else {
-                            MapLocation dig = null;
-                            for (MapLocation m : digSpots) {
-                                if (current.isAdjacentTo(m) && tryDig(current.directionTo(m)))
-                                    return;
-                                else if (dig == null)
-                                    dig = m;
-                                else
-                                    dig = closestLocation(new MapLocation[]{dig, m});
-                            }
-                            pathTo(dig);
-                        }
-                    }
-                }
-                return;
-            } else if (!startDump && !innerSpots.isEmpty()) {
+            System.out.println("I'm not in position yet");
+            if (!startDump && !innerSpots.isEmpty()) {
                 ArrayList<MapLocation> toRemove = new ArrayList<>();
                 for (MapLocation m : innerSpots) {
                     if (rc.canSenseLocation(m)) {
@@ -206,86 +184,82 @@ public class Landscaper extends Robot{
             }
             return;
         }
-        if (attackStrat) {
-            ArrayList<MapLocation> toRemove = new ArrayList<>();
+        if (startDump && rc.getDirtCarrying() > 0) {
+            System.out.println("Let's start that wall");
             MapLocation dump = null;
-            if (rc.getDirtCarrying() > 0) {
-                for (MapLocation m : dumpSpots) {
-                    if (!rc.canSenseLocation(m))
+            /*ArrayList<MapLocation> toRemove = new ArrayList<>();
+            for (MapLocation d : dumpSpots) {
+               if (!rc.canSenseLocation(d))
+                    toRemove.add(d);
+                else if (d.distanceSquaredTo(HQ) >= 9 && (rc.senseElevation(d) > outerWallHeight))
+                    toRemove.add(d);
+                else if (!d.isAdjacentTo(current))
+                    toRemove.add(d);
+                else if (dump == null)
+                    dump = d;
+                else if (rc.senseElevation(d) < rc.senseElevation(dump))
+                    dump = d;
+            }
+            */
+
+
+            ArrayList<MapLocation> toRemove = new ArrayList<>();
+            for (MapLocation d : dumpSpots) {
+                if (!rc.canSenseLocation(d))
+                    continue;
+                else if (d.distanceSquaredTo(HQ) >= 9 && (rc.senseElevation(d) > outerWallHeight))
+                    toRemove.add(d);
+                else if (!d.isAdjacentTo(current))
+                    continue;
+                else if (dump == null)
+                    dump = d;
+                else if (rc.senseElevation(d) < rc.senseElevation(dump))
+                    dump = d;
+            }
+
+
+            dumpSpots.removeAll(toRemove);
+            if (dump != null && tryDeposit(current.directionTo(dump)))
+                return;
+        } else if (!startDump && !innerSpots.contains(rc.getLocation())) {
+            ArrayList<MapLocation> toRemove = new ArrayList<>();
+            for (MapLocation m : innerSpots) {
+                if (rc.canSenseLocation(m)) {
+                    RobotInfo r = rc.senseRobotAtLocation(m);
+                    if (r != null && r.type == RobotType.LANDSCAPER)
                         toRemove.add(m);
-                    else if (!current.isAdjacentTo(m))
-                        toRemove.add(m);
-                    else if (dump == null || rc.senseElevation(m) < rc.senseElevation(dump))
-                        dump = m;
-                }
-                dumpSpots.removeAll(toRemove);
-                if (tryDeposit(current.directionTo(dump)))
-                    return;
-            }
-            for (MapLocation m : digSpots) {
-                if (rc.canSenseLocation(m) && current.isAdjacentTo(m) & tryDig(current.directionTo(m)))
-                    return;
-            }
-        } else {
-            if (startDump && rc.getDirtCarrying() > 0) {
-                MapLocation dump = null;
-                ArrayList<MapLocation> toRemove = new ArrayList<>();
-                for (MapLocation d : dumpSpots) {
-                    if (!rc.canSenseLocation(d))
-                        toRemove.add(d);
-                    else if (d.distanceSquaredTo(HQ) >= 9 && (rc.senseElevation(d) > outerWallHeight))
-                        toRemove.add(d);
-                    else if (!d.isAdjacentTo(current))
-                        toRemove.add(d);
-                    else if (dump == null)
-                        dump = d;
-                    else if (rc.senseElevation(d) < rc.senseElevation(dump))
-                        dump = d;
-                }
-                dumpSpots.removeAll(toRemove);
-                if (dump != null && tryDeposit(current.directionTo(dump)))
-                    return;
-            }
-            else if (!startDump && !innerSpots.contains(rc.getLocation())){
-                ArrayList<MapLocation> toRemove = new ArrayList<>();
-                for (MapLocation m : innerSpots){
-                    if (rc.canSenseLocation(m)){
-                        RobotInfo r = rc.senseRobotAtLocation(m);
-                        if (r != null && r.type == RobotType.LANDSCAPER)
-                            toRemove.add(m);
-                    }
-                }
-                innerSpots.removeAll(toRemove);
-                if (!innerSpots.isEmpty()) {
-                    pathTo(closestLocation(innerSpots.toArray(new MapLocation[0])));
-                    return;
                 }
             }
-            else if (!startDump && rc.getDirtCarrying() > 0){
-                MapLocation dump = null;
-                ArrayList<MapLocation> toRemove = new ArrayList<>();
-                for (MapLocation d : firstDump) {
-                    if (!rc.canSenseLocation(d))
-                        toRemove.add(d);
-                    else if (!d.isAdjacentTo(current))
-                        toRemove.add(d);
-                    else if (rc.senseRobotAtLocation(d) != null && (rc.senseRobotAtLocation(d).type == RobotType.VAPORATOR  ||rc.senseRobotAtLocation(d).type == RobotType.NET_GUN))
-                        toRemove.add(d);
-                    else if (rc.senseElevation(d) - rc.senseElevation(HQ) >= 3)
-                        toRemove.add(d);
-                    else if (dump == null)
-                        dump = d;
-                    else if (rc.senseElevation(d) < rc.senseElevation(dump))
-                        dump = d;
-                }
-                firstDump.removeAll(toRemove);
-                if (dump != null && tryDeposit(current.directionTo(dump)))
-                    return;
+            innerSpots.removeAll(toRemove);
+            if (!innerSpots.isEmpty()) {
+                pathTo(closestLocation(innerSpots.toArray(new MapLocation[0])));
+                return;
             }
-            for (MapLocation m : digSpots) {
-                if (rc.canSenseLocation(m) && rc.getLocation().isAdjacentTo(m) && tryDig(rc.getLocation().directionTo(m)))
-                    return;
+        } else if (!startDump && rc.getDirtCarrying() > 0) {
+            System.out.println("Let's start the initial wall");
+            MapLocation dump = null;
+            ArrayList<MapLocation> toRemove = new ArrayList<>();
+            for (MapLocation d : firstDump) {
+                if (!rc.canSenseLocation(d))
+                    toRemove.add(d);
+                else if (!d.isAdjacentTo(current))
+                    toRemove.add(d);
+                else if (rc.senseRobotAtLocation(d) != null && (rc.senseRobotAtLocation(d).type == RobotType.VAPORATOR || rc.senseRobotAtLocation(d).type == RobotType.NET_GUN))
+                    toRemove.add(d);
+                else if (rc.senseElevation(d) - rc.senseElevation(HQ) >= 3)
+                    toRemove.add(d);
+                else if (dump == null)
+                    dump = d;
+                else if (rc.senseElevation(d) < rc.senseElevation(dump))
+                    dump = d;
             }
+            firstDump.removeAll(toRemove);
+            if (dump != null && tryDeposit(current.directionTo(dump)))
+                return;
+        }
+        for (MapLocation m : digSpots) {
+            if (rc.canSenseLocation(m) && rc.getLocation().isAdjacentTo(m) && tryDig(rc.getLocation().directionTo(m)))
+                return;
         }
     }
 
@@ -330,21 +304,45 @@ public class Landscaper extends Robot{
          }
         else{
             System.out.println("it's digging time");
-            for (MapLocation m : digSpots){
-                System.out.println("Checking dsdigspot " + m);
-                if (rc.canSenseLocation(m) && rc.getLocation().isAdjacentTo(m) && tryDig(rc.getLocation().directionTo(m)))
-                    return;
+            for (Direction dir : directions){
+                if(digSpots.contains(rc.getLocation().add(dir)))
+                    if (tryDig(dir))
+                        return;
             }
         }
         dsdumpSpots.removeAll(toRemove);
         if(!dsdumpSpots.isEmpty()) {
-            if (rc.getDirtCarrying() > 0)
-                pathTo(closestLocation(dsdumpSpots.toArray(new MapLocation[0])));
-            else
-                pathTo(closestLocation(digSpots.toArray(new MapLocation[0])));
+            if (rc.getDirtCarrying() == 25) {
+                MapLocation m = closestLocation(dsdumpSpots.toArray(new MapLocation[0]));
+                Direction dir = rc.getLocation().directionTo(m);
+                if (tryMove(dir))
+                    return;
+                else if (tryMove(dir.rotateLeft()))
+                    return;
+                else if (tryMove(dir.rotateRight()))
+                    return;
+                /*
+                for (Direction dir : Direction.cardinalDirections()){
+                    for (MapLocation m : dsdumpSpots){
+                        if (ds.add(dir).isAdjacentTo(m))
+                            if(tryMove(rc.getLocation().directionTo(ds.add(dir))))
+                                return;
+                    }
+                }*/
+            }
+            for (Direction dir : directions) {
+                if (digSpots.contains(rc.getLocation().add(dir)))
+                    if (tryDig(dir))
+                        return;
+            }
+            pathTo(closestLocation(digSpots.toArray(new MapLocation[0])));
         }
-        else
+        else {
+            int[] msg = new int[7];
+            msg[0] = TEAM_ID;
+            msg[1] = DS_SECURE;
             ds_secure = true;
-        //ds_secure = true;
+            sendMessage(msg, DEFCON5);
+        }
     }
 }

@@ -15,6 +15,7 @@ public class Miner extends Robot {
     public static MapLocation fc = null, ds = null;
     public static MapLocation pickup = null;
     public static boolean attack;
+    public static HashSet<MapLocation> wall;
 
     Miner(RobotController r) throws GameActionException {
         super(r);
@@ -24,38 +25,23 @@ public class Miner extends Robot {
             builder = true;
             vaporators = new ArrayDeque<>();
             netGuns = new ArrayDeque<>();
-            if (attack) {
-                vaporators.add(HQ.add(Direction.NORTH).add(Direction.NORTHWEST));
-                vaporators.add(HQ.add(Direction.NORTH).add(Direction.NORTHEAST));
-                vaporators.add(HQ.add(Direction.EAST).add(Direction.NORTHEAST));
-                vaporators.add(HQ.add(Direction.EAST).add(Direction.SOUTHEAST));
-                vaporators.add(HQ.add(Direction.SOUTH).add(Direction.SOUTHEAST));
-                vaporators.add(HQ.add(Direction.SOUTH).add(Direction.SOUTHWEST));
-                vaporators.add(HQ.add(Direction.WEST).add(Direction.SOUTHWEST));
-                vaporators.add(HQ.add(Direction.WEST).add(Direction.NORTHWEST));
-
-                netGuns.add(HQ.add(Direction.NORTHWEST).add(Direction.NORTHWEST));
-                netGuns.add(HQ.add(Direction.NORTHEAST).add(Direction.NORTHEAST));
-                netGuns.add(HQ.add(Direction.SOUTHEAST).add(Direction.SOUTHEAST));
-                netGuns.add(HQ.add(Direction.SOUTHWEST).add(Direction.SOUTHWEST));
-            } else {
-                MapLocation[] edges = new MapLocation[4];
-                edges[0] = new MapLocation(0, HQ.y);
-                edges[1] = new MapLocation(rc.getMapWidth() - 1, HQ.y);
-                edges[2] = new MapLocation(HQ.x, 0);
-                edges[3] = new MapLocation(HQ.x, rc.getMapHeight() - 1);
-                MapLocation v = edges[0];
-                for (MapLocation edge : edges) {
-                    if (HQ.distanceSquaredTo(edge) < HQ.distanceSquaredTo(v))
-                        v = edge;
-                }
-                v = HQ.add(HQ.directionTo(v));
-                vaporators.add(v);
-                for (Direction dir : Direction.cardinalDirections()) {
-                    if (!v.equals(HQ.add(dir)))
-                        netGuns.add(HQ.add(dir));
-                }
+            MapLocation[] edges = new MapLocation[4];
+            edges[0] = new MapLocation(0, HQ.y);
+            edges[1] = new MapLocation(rc.getMapWidth() - 1, HQ.y);
+            edges[2] = new MapLocation(HQ.x, 0);
+            edges[3] = new MapLocation(HQ.x, rc.getMapHeight() - 1);
+            MapLocation v = edges[0];
+            for (MapLocation edge : edges) {
+                if (HQ.distanceSquaredTo(edge) < HQ.distanceSquaredTo(v))
+                    v = edge;
             }
+            v = HQ.add(HQ.directionTo(v));
+            vaporators.add(v);
+            for (Direction dir : Direction.cardinalDirections()) {
+                if (!v.equals(HQ.add(dir)))
+                    netGuns.add(HQ.add(dir));
+            }
+            wall = initWallSpots();
         }
         refineries.add(HQ);
     }
@@ -104,7 +90,9 @@ public class Miner extends Robot {
         } else if (rc.getLocation().isAdjacentTo(HQ)) {
             for (Direction dir : directions)
                 tryMove(dir);
-        } else
+        } else if (wall.contains(rc.getLocation()))
+            builderMove();
+        else
             pathTo(HQ);
         return 5;
     }
@@ -318,36 +306,53 @@ public class Miner extends Robot {
         MapLocation target = closestLocation(netGuns.toArray(new MapLocation[0]));
         System.out.println("let's try building a net gun at " + target);
         System.out.println(Clock.getBytecodesLeft());
-        if (rc.getLocation().equals(target)) {
-            for (Direction dir : directions)
-                tryMove(dir);
-        } else if (rc.getLocation().isAdjacentTo(target)) {
+        if (!rc.getLocation().equals(target) && rc.getLocation().isAdjacentTo(target)) {
             if (tryBuild(RobotType.NET_GUN, rc.getLocation().directionTo(target))) {
                 netGuns.remove(target);
                 return true;
             }
-            return false;
         } else
-            pathTo(target);
+            builderMove();
         return false;
     }
 
     private boolean buildVaporator() throws GameActionException {
         MapLocation target = closestLocation(vaporators.toArray(new MapLocation[0]));
         if (rc.getLocation().equals(target)) {
-            for (Direction dir : directions)
-                tryMove(dir);
+            builderMove();
         } else if (rc.getLocation().isAdjacentTo(target)) {
             if (tryBuild(RobotType.VAPORATOR, rc.getLocation().directionTo(target))) {
                 vaporators.remove(target);
                 return true;
             }
-            return false;
         } else
             pathTo(target);
         return false;
     }
 
+    private void builderMove() throws GameActionException{
+        MapLocation target = rc.getLocation();
+        if (!vaporators.isEmpty())
+            target = closestLocation(vaporators.toArray(new MapLocation[0]));
+        else if (!netGuns.isEmpty())
+            target = closestLocation(netGuns.toArray(new MapLocation[0]));
+        if (rc.getLocation().equals(target)){
+            for (Direction dir : directions){
+                MapLocation m = rc.getLocation().add(dir);
+                if (wall.contains(m) && rc.canMove(dir))
+                    tryMove(dir);
+            }
+        }
+        else if (rc.getLocation().isAdjacentTo(target))
+            return;
+        Direction move = Direction.CENTER;
+        for (Direction dir : directions){
+            MapLocation m = rc.getLocation().add(dir);
+            if (wall.contains(m) && rc.canMove(dir) && m.distanceSquaredTo(target) < rc.getLocation().distanceSquaredTo(target))
+                move = dir;
+        }
+        tryMove(move);
+    }
 
     private void mineSoup(MapLocation[] soups) throws GameActionException {
         ArrayList<MapLocation> newSoup = new ArrayList<>();

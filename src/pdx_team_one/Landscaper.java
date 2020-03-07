@@ -3,16 +3,16 @@ import battlecode.common.*;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashSet;
 
 public class Landscaper extends Robot{
 
-    private MapLocation target;
-    private ArrayList<MapLocation> dumpSpots = new ArrayList<>();
-    private ArrayList<MapLocation> landSpots = new ArrayList<>();
-    private ArrayList<MapLocation> innerSpots = new ArrayList<>();
-    private ArrayList<MapLocation> digSpots = new ArrayList<>();
-    private ArrayList<MapLocation> dsdumpSpots = new ArrayList<>();
-    private ArrayList<MapLocation> firstDump = new ArrayList<>();
+    private HashSet<MapLocation> dumpSpots = new HashSet<>();
+    private HashSet<MapLocation> landSpots = new HashSet<>();
+    private HashSet<MapLocation> innerSpots = new HashSet<>();
+    private HashSet<MapLocation> digSpots = new HashSet<>();
+    private HashSet<MapLocation> dsdumpSpots = new HashSet<>();
+    private HashSet<MapLocation> firstDump = new HashSet<>();
     public boolean attackStrat;
     public boolean startDump;
     public boolean ds_secure;
@@ -31,8 +31,8 @@ public class Landscaper extends Robot{
         for (; lastBlockRead < rc.getRoundNum(); lastBlockRead++)
             parseBlockchain(lastBlockRead);
         for (Direction dir : corners) {
-            innerSpots.add(HQ.add(dir));
-            landSpots.add(HQ.add(dir));
+//            innerSpots.add(HQ.add(dir));
+//            landSpots.add(HQ.add(dir));
             digSpots.add(HQ.add(dir));
             firstDump.add(HQ.add(dir.rotateRight()));
         }
@@ -48,13 +48,13 @@ public class Landscaper extends Robot{
             if (rc.onTheMap(ds.add(dir).add(dir.rotateRight())))
                 digSpots.add(ds.add(dir).add(dir.rotateRight()));
             if (rc.onTheMap(HQ.add(dir).add(dir))) {
-                dumpSpots.add(HQ.add(dir).add(dir));
+ //               dumpSpots.add(HQ.add(dir).add(dir));
                 firstDump.add(HQ.add(dir).add(dir));
             }
             if (rc.onTheMap(HQ.add(dir).add(dir.rotateRight())))
                 firstDump.add(HQ.add(dir).add(dir.rotateRight()));
         }
-        for (Direction dir : directions) {
+ /*       for (Direction dir : directions) {
             if (rc.onTheMap(HQ.add(dir).add(dir.rotateRight())))
                 dumpSpots.add(HQ.add(dir).add(dir.rotateRight()));
         }
@@ -77,6 +77,7 @@ public class Landscaper extends Robot{
                 landSpots.add(m);
             }
         }
+        */
         for (int i = -4; i < 4; i++) {
             if (rc.onTheMap(HQ.translate(i, 4)))
                 digSpots.add(HQ.translate(i, 4));
@@ -93,11 +94,18 @@ public class Landscaper extends Robot{
                 digSpots.remove(fc.add(dir));
             }
         }
+
+        innerSpots = initInnerSpots();
+        landSpots.addAll(innerSpots);
+        dumpSpots.addAll(initWallSpots());
+        dumpSpots.addAll(initOuterSpots());
+        landSpots.addAll(dumpSpots);
+
+
         digSpots.remove(fc);
         digSpots.remove(ds);
         digSpots.removeAll(dumpSpots);
         digSpots.removeAll(dsdumpSpots);
-        target = landSpots.get(0);
     }
 
 

@@ -1,6 +1,7 @@
 package pdx_team_one;
 import battlecode.common.*;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Map;
 
 //Parent class for all other robots
@@ -239,5 +240,45 @@ public abstract class Robot {
         for (i = 0; i < soups.length && i < 5; i++)
             msg[i+2] = 100*soups[i].x + soups[i].y;
         return sendMessage(msg, DEFCON5);
+    }
+
+    public HashSet<MapLocation> initInnerSpots(){
+        HashSet<MapLocation> spots = new HashSet<>();
+        for (Direction dir : corners) {
+            if(rc.onTheMap(HQ.add(dir)))
+                spots.add(HQ.add(dir));
+        }
+        return spots;
+    }
+
+    public HashSet<MapLocation> initWallSpots() {
+        HashSet<MapLocation> spots = new HashSet<>();
+        MapLocation m;
+        for (Direction dir : directions) {
+            m = HQ.add(dir).add(dir);
+            if (rc.onTheMap(m))
+                spots.add(m);
+            m = HQ.add(dir).add(dir.rotateRight());
+            if (rc.onTheMap(m))
+                spots.add(m);
+        }
+        return spots;
+    }
+
+    public HashSet<MapLocation> initOuterSpots() {
+        HashSet<MapLocation> spots = new HashSet<>();
+        MapLocation m;
+        for (Direction dir : directions) {
+            m = HQ.add(dir).add(dir).add(dir);
+            if (rc.onTheMap(m))
+                spots.add(m);
+            m = HQ.add(dir).add(dir).add(dir.rotateRight());
+            if (rc.onTheMap(m))
+                spots.add(m);
+            m = HQ.add(dir).add(dir).add(dir.rotateLeft());
+            if (rc.onTheMap(m))
+                spots.add(m);
+        }
+        return spots;
     }
 }

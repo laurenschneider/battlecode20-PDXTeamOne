@@ -15,9 +15,9 @@ public class DeliveryDrone extends Robot{
     private boolean ds_secure = false;
     private MapLocation home = null;
     private boolean attackStrat;
-    private ArrayDeque<MapLocation> innerSpots = new ArrayDeque<>();
-    private ArrayDeque<MapLocation> wallSpots = new ArrayDeque<>();
-    private ArrayDeque<MapLocation> outerSpots = new ArrayDeque<>();
+    private HashSet<MapLocation> innerSpots = new HashSet<>();
+    private HashSet<MapLocation> wallSpots = new HashSet<>();
+    private HashSet<MapLocation> outerSpots = new HashSet<>();
     private ArrayList<MapLocation> blockSoups = new ArrayList<>();
 
     DeliveryDrone(RobotController r) throws GameActionException
@@ -27,39 +27,9 @@ public class DeliveryDrone extends Robot{
             parseBlockchain(lastBlockRead);
         if (home == null)
             home = rc.getLocation();
-        if (attackStrat) {
-            for (Direction dir : directions)
-                wallSpots.add(HQ.add(dir).add(dir).add(dir));
-            for (Direction dir : directions)
-                wallSpots.add(HQ.add(dir).add(dir).add(dir.rotateRight()));
-            for (Direction dir : directions)
-                wallSpots.add(HQ.add(dir).add(dir).add(dir.rotateLeft()));
-        }
-        else{
-            for (Direction dir : corners)
-                innerSpots.add(HQ.add(dir));
-            for (Direction dir : directions)
-                wallSpots.add(HQ.add(dir).add(dir));
-            for (Direction dir : directions)
-                wallSpots.add(HQ.add(dir).add(dir.rotateRight()));
-            for (Direction dir : directions)
-                outerSpots.add(HQ.add(dir).add(dir).add(dir));
-            for (Direction dir : directions)
-                outerSpots.add(HQ.add(dir).add(dir).add(dir.rotateRight()));
-            for (Direction dir : directions)
-                outerSpots.add(HQ.add(dir).add(dir).add(dir.rotateLeft()));
-        }
-        ArrayList<MapLocation> toRemove = new ArrayList<>();
-        for (MapLocation m : wallSpots) {
-            if (!rc.onTheMap(m))
-                toRemove.add(m);
-        }
-        for (MapLocation m : outerSpots) {
-            if (!rc.onTheMap(m))
-                toRemove.add(m);
-        }
-        wallSpots.removeAll(toRemove);
-        outerSpots.removeAll(toRemove);
+        innerSpots = initInnerSpots();
+        wallSpots = initWallSpots();
+        outerSpots = initOuterSpots();
     }
 
     public void takeTurn() throws GameActionException {
@@ -103,7 +73,7 @@ public class DeliveryDrone extends Robot{
         return;
     }
 
-     boolean deliverLS(ArrayDeque<MapLocation> spots) throws GameActionException{
+     boolean deliverLS(HashSet<MapLocation> spots) throws GameActionException{
         ArrayDeque<MapLocation> toRemove = new ArrayDeque<>();
         MapLocation target = null;
         for (MapLocation m : spots) {

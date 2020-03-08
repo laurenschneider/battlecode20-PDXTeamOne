@@ -255,7 +255,7 @@ public class Landscaper extends Robot {
                 i++;
             if (rc.senseElevation(current) <= i) {
                 for (Direction dir : directions) {
-                    if (rc.senseFlooding(current.add(dir))) {
+                    if (rc.onTheMap(current.add(dir)) && rc.senseFlooding(current.add(dir))) {
                         floodDanger = true;
                         break;
                     }
@@ -263,7 +263,7 @@ public class Landscaper extends Robot {
             }
             if (floodDanger) {
                 for (Direction dir : directions) {
-                    if (rc.senseElevation(rc.getLocation().add(dir)) > i)
+                    if (rc.onTheMap(current.add(dir)) && rc.senseElevation(current.add(dir)) > i)
                         if (tryDig(dir))
                             return;
                 }

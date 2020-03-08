@@ -47,7 +47,7 @@ public class DeliveryDrone extends Robot{
             parseBlockchain(lastBlockRead);
         if (rc.isReady()) {
             if (rc.isCurrentlyHoldingUnit()) {
-                System.out.println("I am holding a unit!");
+                //System.out.println("I am holding a unit!");
                 if (holding.team == rc.getTeam())
                     deliverFriend();
                 else
@@ -63,7 +63,7 @@ public class DeliveryDrone extends Robot{
         ArrayDeque<MapLocation> toRemove = new ArrayDeque<>();
         MapLocation target = null;
         for (MapLocation m : spots) {
-            System.out.println("Maybe my friend wants to go to " + m);
+           // System.out.println("Maybe my friend wants to go to " + m);
             if (rc.canSenseLocation(m)) {
                 RobotInfo r = rc.senseRobotAtLocation(m);
                 if (r != null && r.type == RobotType.LANDSCAPER)
@@ -85,16 +85,16 @@ public class DeliveryDrone extends Robot{
                     tryMove(dir);
             }
             else if (rc.getLocation().isAdjacentTo(target) && rc.canDropUnit(rc.getLocation().directionTo(target))) {
-                System.out.println("Dropping him off at " + target);
+                //System.out.println("Dropping him off at " + target);
                 rc.dropUnit(rc.getLocation().directionTo(target));
                 spots.remove(target);
                 holding = null;
                 return true;
             }
             else {
-                System.out.println("Before: " + Clock.getBytecodesLeft());
+               // System.out.println("Before: " + Clock.getBytecodesLeft());
                 pathTo(target);
-                System.out.println("After:  " + Clock.getBytecodesLeft());
+                //System.out.println("After:  " + Clock.getBytecodesLeft());
             }
         }
         else if (!spots.isEmpty()) {
@@ -103,8 +103,8 @@ public class DeliveryDrone extends Robot{
                 for (Direction dir : directions)
                     tryMove(dir);
             }
-            System.out.println("Carrying friend to " + target);
-            System.out.println(Clock.getBytecodesLeft() + "  " + rc.isReady());
+            //System.out.println("Carrying friend to " + target);
+            //System.out.println(Clock.getBytecodesLeft() + "  " + rc.isReady());
             pathTo(target);
             return true;
         }
@@ -122,7 +122,7 @@ public class DeliveryDrone extends Robot{
             }
         }
         if (holding.ID == builderID && builderDropoff != null) {
-            System.out.println("Build needs to move to " + builderDropoff);
+            //System.out.println("Build needs to move to " + builderDropoff);
             if (rc.getLocation().equals(builderDropoff)) {
                 for (Direction dir : directions)
                     tryMove(dir);
@@ -383,10 +383,13 @@ public class DeliveryDrone extends Robot{
         if (target != null)
             return pickupUnit(target);
         if (!friends.isEmpty()) {
+            HashSet<Integer> toRemove = new HashSet();
             for (int key : friends.keySet()) {
                 if (rc.canSenseLocation(friends.get(key)))
-                    friends.remove(key);
+                    toRemove.add(key);
             }
+            for (int key : toRemove)
+                friends.remove(key);
             if (!friends.isEmpty()) {
                 pathTo(closestLocation(friends.values().toArray(new MapLocation[0])));
                 return 253452345;

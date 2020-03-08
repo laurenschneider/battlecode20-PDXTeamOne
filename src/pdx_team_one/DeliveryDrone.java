@@ -53,7 +53,7 @@ public class DeliveryDrone extends Robot{
                 else
                     destroyEnemy();
             } else {
-                turnsHeld++;
+                turnsHeld = 0;
                 findSomethingToDo();
             }
         }

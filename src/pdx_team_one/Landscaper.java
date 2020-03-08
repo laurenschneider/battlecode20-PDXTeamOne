@@ -18,7 +18,7 @@ public class Landscaper extends Robot {
     private MapLocation fc = null, ds = null;
     public int dsElevation;
     int outerWallHeight = 100;
-    int[] waterLevel = new int[]{0,256,464,677,930,1210};
+    int[] waterLevel = new int[]{0,256,464,677,930,1210,50000};
 
     Landscaper(RobotController r) throws GameActionException {
         super(r);
@@ -250,8 +250,9 @@ public class Landscaper extends Robot {
         }
         if (rc.isReady()) {
             boolean floodDanger = false;
-            int i;
-            for (i = 0; waterLevel[i] < rc.getRoundNum(); i++) ;
+            int i = 0;
+            while (waterLevel[i] < rc.getRoundNum())
+                i++;
             if (rc.senseElevation(current) <= i) {
                 for (Direction dir : directions) {
                     if (rc.senseFlooding(current.add(dir))) {

@@ -13,11 +13,11 @@ public class HQ extends Robot{
     private boolean[][] visited = new boolean[rc.getMapWidth()][rc.getMapHeight()];
     private HashSet<MapLocation> dsSpots = new HashSet<>();
     private HashSet<MapLocation> fcSpots = new HashSet<>();
-    private HashSet<MapLocation> innerSpots = new HashSet<>();
-    private HashSet<MapLocation> wallSpots = new HashSet<>();
+    private HashSet<MapLocation> innerSpots;
+    private HashSet<MapLocation> wallSpots;
     int DSelevation = -100000;
     private ArrayDeque<Node> checkSpots = new ArrayDeque<>();
-    int phase = 1;
+    int phase = 0;
 
     class Node{
         int moves;
@@ -35,12 +35,18 @@ public class HQ extends Robot{
         HQ = rc.getLocation();
         visited[HQ.x][HQ.y] = true;
         checkSpots.add(new Node(0,HQ));
-        for (Direction dir : corners)
-            innerSpots.add(HQ.add(dir));
-        for (Direction dir : directions){
-            wallSpots.add(HQ.add(dir).add(dir));
-            wallSpots.add(HQ.add(dir).add(dir.rotateRight()));
-        }
+        innerSpots = initInnerSpots();
+        wallSpots = initWallSpots();
+        int soup = 0;
+
+        for (MapLocation m : rc.senseNearbySoup())
+            soup += rc.senseSoup(m);
+        maxMiners = soup/500;
+        if (maxMiners < 4)
+            maxMiners = 4;
+        if (maxMiners > 6)
+            maxMiners = 6;
+
     }
 
     public void takeTurn() throws GameActionException {
@@ -97,11 +103,20 @@ public class HQ extends Robot{
                 System.out.println("DS: " + ds);
             }
             else{
-                System.out.println("No suitable Locations");
-                rc.resign();
+                //System.out.println("No suitable locations");
+                ds = HQ.add(Direction.NORTH).add(Direction.NORTH).add(Direction.NORTH);
+                fc = HQ.add(Direction.NORTH).add(Direction.NORTH).add(Direction.NORTHEAST);
+                int[] msg = new int[7];
+                msg[0] = TEAM_ID;
+                msg[1] = DEFENSE;
+                msg[2] = fc.x;
+                msg[3] = fc.y;
+                msg[4] = ds.x;
+                msg[5] = ds.y;
+                sendMessage(msg, DEFCON5);
             }
             strategy = true;
-            System.out.println("Ending with " + Clock.getBytecodesLeft());
+            //System.out.println("Ending with " + Clock.getBytecodesLeft());
         }
         checkPhase();
     }
@@ -174,29 +189,45 @@ public class HQ extends Robot{
     }
 
     public void checkPhase() throws GameActionException{
-        if (phase == 1){
-            for (Direction dir: Direction.cardinalDirections()){
-                RobotInfo r = rc.senseRobotAtLocation(HQ.add(dir));
-                if (r == null || (r.type != RobotType.VAPORATOR && r.type != RobotType.NET_GUN))
-                    return;
+        if(phase == 0) {
+            for (Direction dir : directions) {
+                MapLocation m = HQ.add(dir);
+                if(rc.onTheMap(m)) {
+                    if (rc.canSenseLocation(m) && rc.senseRobotAtLocation(m) != null && rc.senseRobotAtLocation(m).type == RobotType.VAPORATOR) {
+                        int[] msg = new int[7];
+                        msg[0] = TEAM_ID;
+                        msg[1] = VAPORATOR_BUILT;
+                        if (sendMessage(msg, DEFCON5))
+                            phase++;
+                    }
+                }
             }
-            System.out.println("Starting phase 2");
-            int[] msg = new int[7];
-            msg[0] = TEAM_ID;
-            msg[1] = START_PHASE_2;
-            if(sendMessage(msg,DEFCON5))
-                phase++;
         }
-        if (phase == 2){
+        if (phase == 1){
             for (MapLocation m : innerSpots){
                 RobotInfo r = rc.senseRobotAtLocation(m);
                 if (r== null || r.type!= RobotType.LANDSCAPER)
                     return;
             }
-            System.out.println("Inner Spots filled");
+           // System.out.println("Inner Spots filled");
             int[] msg = new int[7];
             msg[0] = TEAM_ID;
             msg[1] = INNER_SPOTS_FILLED;
+            if(sendMessage(msg,DEFCON5))
+                phase++;
+        }
+        else if (phase == 2){
+            for (Direction dir: Direction.cardinalDirections()) {
+                if (rc.onTheMap(HQ.add(dir))) {
+                    RobotInfo r = rc.senseRobotAtLocation(HQ.add(dir));
+                    if (r == null || (r.type != RobotType.VAPORATOR && r.type != RobotType.NET_GUN))
+                        return;
+                }
+            }
+           // System.out.println("Starting phase 2");
+            int[] msg = new int[7];
+            msg[0] = TEAM_ID;
+            msg[1] = START_PHASE_2;
             if(sendMessage(msg,DEFCON5))
                 phase++;
         }

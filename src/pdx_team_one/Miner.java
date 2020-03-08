@@ -16,6 +16,8 @@ public class Miner extends Robot {
     public static MapLocation pickup = null;
     public static boolean attack;
     public static HashSet<MapLocation> wall;
+    public boolean buildNetGuns;
+    public int turnsStuck = 0;
 
     Miner(RobotController r) throws GameActionException {
         super(r);
@@ -73,7 +75,7 @@ public class Miner extends Robot {
             System.out.println("let's build net guns");//let's build shit
             buildNetGun();
             return 7;
-        } else if (netGuns.isEmpty() && vaporators.isEmpty()) {
+        } else if (buildNetGuns && netGuns.isEmpty() && vaporators.isEmpty()) {
             builder = false;
             return doMinerThings(soups);
         } else if (!design_school && soups.length > 0) {
@@ -100,11 +102,30 @@ public class Miner extends Robot {
     public int doMinerThings(MapLocation[] soups) throws GameActionException {
         if (rc.getLocation().distanceSquaredTo(HQ) <= 18 && rc.senseElevation(rc.getLocation()) - hqElevation >= 15) {
             if (pickup == null || pickup != rc.getLocation()) {
-                if (askForDrone())
+                if (askForDrone()) {
+                    turnsStuck = 0;
                     pickup = rc.getLocation();
+                }
                 return 0;
             }
+            else if (turnsStuck < 20)
+                turnsStuck++;
+            else
+                rc.disintegrate();
             return 1;
+        }
+        if (fc != null && fc.equals(rc.getLocation())){
+            scout();
+            return 55;
+        }
+        if (rc.getLocation().isAdjacentTo(HQ) && rc.getSoupCarrying() < soup_threshold) {
+            if(turnsStuck >= 5) {
+                scout();
+                turnsStuck = 0;
+                return 34;
+            }
+            else
+                turnsStuck++;
         }
         for (RobotInfo r : rc.senseNearbyRobots(-1, rc.getTeam())) {
             if (r.type == RobotType.REFINERY && !refineries.contains(r.location))
@@ -112,8 +133,11 @@ public class Miner extends Robot {
         }
         //if soups in range
         if (soups.length > 0) {
+            MapLocation m = closestLocation(soups);
+            if (m.isAdjacentTo(rc.getLocation()) && (refineries.isEmpty() || rc.getLocation().distanceSquaredTo(closestLocation(refineries.toArray(new MapLocation[0]))) > 100))
+                buildRefinery();
             //if we can carry more soup, then go get more soup
-            if (rc.getSoupCarrying() < RobotType.MINER.soupLimit)
+            else if (rc.getSoupCarrying() < RobotType.MINER.soupLimit)
                 mineSoup(soups);
                 //otherwise either find a refinery or build a refinery
             else
@@ -136,8 +160,20 @@ public class Miner extends Robot {
         int[] msg = new int[7];
         msg[0] = TEAM_ID;
         msg[1] = NEED_DELIVERY;
-        //msg[2] = target.x;
-        //msg[3] = target.y;
+        msg[2] = -1;
+        msg[3] = -1;
+        msg[4] = rc.getID();
+        msg[5] = rc.getLocation().x;
+        msg[6] = rc.getLocation().y;
+        return sendMessage(msg, DEFCON5);
+    }
+
+    public boolean askForDrone(MapLocation m) throws GameActionException {
+        int[] msg = new int[7];
+        msg[0] = TEAM_ID;
+        msg[1] = NEED_DELIVERY;
+        msg[2] = m.x;
+        msg[3] = m.y;
         msg[4] = rc.getID();
         msg[5] = rc.getLocation().x;
         msg[6] = rc.getLocation().y;
@@ -186,6 +222,8 @@ public class Miner extends Robot {
                     ds = new MapLocation(t.getMessage()[4], t.getMessage()[5]);
                 } else if (t.getMessage()[1] == START_PHASE_2) {
                     refineries.remove(HQ);
+                } else if (t.getMessage()[1] == INNER_SPOTS_FILLED){
+                    buildNetGuns = true;
                 }
             }
         }
@@ -222,7 +260,6 @@ public class Miner extends Robot {
             scout();
         else {
             ArrayList<MapLocation> toRemove = new ArrayList<>();
-            MapLocation target = null;
             for (MapLocation m : blockSoups) {
                 if (rc.canSenseLocation(m))
                     toRemove.add(m);
@@ -243,39 +280,87 @@ public class Miner extends Robot {
     }
 
     private boolean buildDesignSchool() throws GameActionException {
-        if (rc.getLocation().equals(ds)) {
+        if (turnsStuck >= 10){
+            Direction d = null;
+            if (rc.getLocation().distanceSquaredTo(HQ) <= 18) {
+                tryMove(rc.getLocation().directionTo(HQ).opposite());
+                tryMove(rc.getLocation().directionTo(HQ).opposite().rotateLeft());
+                tryMove(rc.getLocation().directionTo(HQ).opposite().rotateRight());
+                return false;
+            }
+            for (Direction dir : directions){
+                if (rc.canBuildRobot(RobotType.DESIGN_SCHOOL,dir)){
+                    if (d == null || rc.senseElevation(rc.getLocation().add(dir)) > rc.senseElevation(rc.getLocation().add(d)))
+                        d = dir;
+                }
+            }
+            if (d== null)
+                scout();
+            else if (tryBuild(RobotType.DESIGN_SCHOOL,d)){
+                design_school = true;
+                turnsStuck = 0;
+                return true;
+            }
+        }
+        else if (rc.getLocation().equals(ds)) {
             for (Direction dir : directions)
                 tryMove(dir);
+            turnsStuck++;
         }
-        if (rc.canSenseLocation(ds) && rc.getLocation().isAdjacentTo(ds)) {
+        else if (rc.canSenseLocation(ds) && rc.getLocation().isAdjacentTo(ds)) {
             if (tryBuild(RobotType.DESIGN_SCHOOL, rc.getLocation().directionTo(ds))) {
                 design_school = true;
+                turnsStuck = 0;
                 return true;
             } else {
                 for (Direction dir : directions)
                     tryMove(dir);
+                turnsStuck++;
             }
-        } else
+        } else {
+            turnsStuck++;
             pathTo(ds);
+        }
         return false;
 
     }
 
     private boolean buildFulfillmentCenter() throws GameActionException {
-        if (rc.getLocation().equals(fc)) {
+        if (turnsStuck >= 10){
+            Direction d = null;
+            for (Direction dir : directions){
+                if (rc.canBuildRobot(RobotType.FULFILLMENT_CENTER,dir)){
+                    if (d == null || rc.senseElevation(rc.getLocation().add(dir)) > rc.senseElevation(rc.getLocation().add(d)))
+                        d = dir;
+                }
+            }
+            if (d== null)
+                scout();
+            else if (tryBuild(RobotType.FULFILLMENT_CENTER,d)){
+                fulfillment_center = true;
+                turnsStuck = 0;
+                return true;
+            }
+        }
+        else if (rc.getLocation().equals(fc)) {
             for (Direction dir : directions)
                 tryMove(dir);
+            turnsStuck++;
         }
-        if (rc.canSenseLocation(fc) && rc.getLocation().isAdjacentTo(fc)) {
+        else if (rc.canSenseLocation(fc) && rc.getLocation().isAdjacentTo(fc)) {
             if (tryBuild(RobotType.FULFILLMENT_CENTER, rc.getLocation().directionTo(fc))) {
                 fulfillment_center = true;
+                turnsStuck = 0;
                 return true;
             } else {
                 for (Direction dir : directions)
                     tryMove(dir);
+                turnsStuck++;
             }
-        } else
+        } else {
             pathTo(fc);
+            turnsStuck++;
+        }
         return false;
 
 
@@ -303,16 +388,15 @@ public class Miner extends Robot {
     }
 
     private boolean buildNetGun() throws GameActionException {
-        MapLocation target = closestLocation(netGuns.toArray(new MapLocation[0]));
-        System.out.println("let's try building a net gun at " + target);
-        System.out.println(Clock.getBytecodesLeft());
-        if (!rc.getLocation().equals(target) && rc.getLocation().isAdjacentTo(target)) {
-            if (tryBuild(RobotType.NET_GUN, rc.getLocation().directionTo(target))) {
-                netGuns.remove(target);
-                return true;
+        for (MapLocation m : netGuns) {
+            if (!rc.getLocation().equals(m) && rc.getLocation().isAdjacentTo(m)) {
+                if (tryBuild(RobotType.NET_GUN, rc.getLocation().directionTo(m))) {
+                    netGuns.remove(m);
+                    return true;
+                }
             }
-        } else
-            builderMove();
+        }
+        builderMove();
         return false;
     }
 
@@ -330,35 +414,78 @@ public class Miner extends Robot {
         return false;
     }
 
-    private void builderMove() throws GameActionException{
+    private void builderMove() throws GameActionException {
         MapLocation target = rc.getLocation();
         if (!vaporators.isEmpty())
             target = closestLocation(vaporators.toArray(new MapLocation[0]));
         else if (!netGuns.isEmpty())
             target = closestLocation(netGuns.toArray(new MapLocation[0]));
-        if (rc.getLocation().equals(target)){
-            for (Direction dir : directions){
+        if (rc.getLocation().equals(target)) {
+            for (Direction dir : directions) {
                 MapLocation m = rc.getLocation().add(dir);
                 if (wall.contains(m) && rc.canMove(dir))
-                    tryMove(dir);
+                    if(tryMove(dir))
+                        return;
             }
-        }
-        else if (rc.getLocation().isAdjacentTo(target))
+        } else if (rc.getLocation().isAdjacentTo(target)) {
+            if (rc.senseElevation(rc.getLocation()) - rc.senseElevation(target) >= 5 || rc.senseElevation(target) - rc.senseElevation(rc.getLocation()) >= 5) {
+                if (pickup == null || !pickup.equals(rc.getLocation())) {
+                    MapLocation adj = rc.getLocation();
+                    for (MapLocation m : wall) {
+                        if (elevationDiff(m,target) < elevationDiff(adj,target))
+                            adj = m;
+                    }
+                    if (!adj.equals(rc.getLocation()) && askForDrone(target.add(HQ.directionTo(target)))) {
+                        pickup = rc.getLocation();
+                        return;
+                    }
+                }
+            }
             return;
+        }
         Direction move = Direction.CENTER;
-        for (Direction dir : directions){
+        for (Direction dir : directions) {
             MapLocation m = rc.getLocation().add(dir);
             if (wall.contains(m) && rc.canMove(dir) && m.distanceSquaredTo(target) < rc.getLocation().distanceSquaredTo(target))
                 move = dir;
         }
-        tryMove(move);
+        if (move == Direction.CENTER || !tryMove(move)) {
+            if (pickup == null || !pickup.equals(rc.getLocation())) {
+                MapLocation adj = null;
+                for (MapLocation m : wall) {
+                    if (rc.canSenseLocation(m) && m.isAdjacentTo(target))
+                        if (adj == null)
+                            adj = m;
+                        else if(elevationDiff(m,target) < elevationDiff(adj,target))
+                            adj = m;
+                }
+                if (!adj.equals(rc.getLocation()) && askForDrone(adj)) {
+                    pickup = rc.getLocation();
+                    return;
+                }
+            }
+        }
+
     }
 
     private void mineSoup(MapLocation[] soups) throws GameActionException {
         ArrayList<MapLocation> newSoup = new ArrayList<>();
+        ArrayList<MapLocation> toRemove = new ArrayList<>();
         for (MapLocation soup : soups) {
-            if (rc.senseFlooding(soup))
+            if (rc.senseElevation(soup) - rc.senseElevation(rc.getLocation()) >= 10 || rc.senseElevation(rc.getLocation()) - rc.senseElevation(soup) >= 10)
                 blockSoups.remove(soup);
+            else if (rc.senseFlooding(soup)){
+                boolean remove = true;
+                for (Direction dir : directions){
+                    if (rc.canSenseLocation(soup.add(dir)) && !rc.senseFlooding(soup.add(dir))){
+                        if (!blockSoups.contains(soup))
+                            blockSoups.add(soup);
+                        remove = false;
+                    }
+                }
+                if (remove)
+                    blockSoups.remove(soup);
+            }
             else if (!blockSoups.contains(soup)) {
                 blockSoups.add(soup);
                 newSoup.add(soup);
@@ -368,8 +495,17 @@ public class Miner extends Robot {
         }
         if (newSoup.size() > 0)
             broadcastSoup(newSoup.toArray(new MapLocation[0]));
-        if (rc.isReady())
-            pathTo(closestLocation(soups));
+        for (MapLocation m : blockSoups){
+            if (rc.canSenseLocation(m) && rc.senseSoup(m) == 0)
+                toRemove.add(m);
+        }
+        blockSoups.removeAll(toRemove);
+        //if(rc.isReady()) {
+            if (!blockSoups.isEmpty())
+                pathTo(closestLocation(blockSoups.toArray(new MapLocation[0])));
+            else if (rc.isReady())
+                scout();
+        //}
     }
 
     private void findRefinery(MapLocation[] soups) throws GameActionException {
@@ -381,9 +517,17 @@ public class Miner extends Robot {
                 findSoup();
         } else {
             MapLocation target = closestLocation(refineries.toArray(new MapLocation[0]));
+            if (rc.canSenseLocation(target)){
+                RobotInfo r = rc.senseRobotAtLocation(target);
+                if (r == null || (r.type != RobotType.REFINERY && r.type != RobotType.HQ)){
+                    refineries.remove(target);
+                    findRefinery(soups);
+                    return;
+                }
+            }
             if (rc.canSenseLocation(target) && rc.getLocation().isAdjacentTo(target))
                 tryRefine(rc.getLocation().directionTo(target));
-            if (rc.getLocation().distanceSquaredTo(target) < 100)
+            else if (rc.getLocation().distanceSquaredTo(target) < 50)
                 pathTo(target);
             else if (soups.length > 0 && rc.getSoupCarrying() == RobotType.MINER.soupLimit && rc.getTeamSoup() >= RobotType.REFINERY.cost)
                 buildRefinery();

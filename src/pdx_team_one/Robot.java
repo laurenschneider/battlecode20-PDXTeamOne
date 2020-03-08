@@ -24,6 +24,8 @@ public abstract class Robot {
     static final int NEED_DELIVERY = 13;
     static final int INNER_SPOTS_FILLED = 14;
     static final int WALL_SPOTS_FILLED = 15;
+    static final int VAPORATOR_BUILT = 16;
+    static final int DRONE_HOME = 17;
 
     //message importance
     //HQ location
@@ -59,21 +61,6 @@ public abstract class Robot {
 
     public abstract void takeTurn() throws GameActionException;
 
-    //strictly for debugging and measuring bytecode performance
-    static private int start, end, startturn, endturn;
-
-    static void start() {
-        start = Clock.getBytecodesLeft();
-        startturn = rc.getRoundNum();
-    }
-
-    static void end(String s) {
-        end = Clock.getBytecodesLeft();
-        endturn = rc.getRoundNum();
-        System.out.println("It took me " + (endturn - startturn) + " turns and " + (start - end) + " bytecodes to " + s);
-    }
-
-
     static Direction[] directions = {
             Direction.NORTH,
             Direction.NORTHEAST,
@@ -98,6 +85,8 @@ public abstract class Robot {
     }
 
     static boolean tryMove(Direction dir) throws GameActionException {
+        if(dir == Direction.CENTER)
+            return false;
         if (rc.isReady() && rc.canMove(dir)) {
             if (rc.senseFlooding(rc.adjacentLocation(dir)) && rc.getType() != RobotType.DELIVERY_DRONE)
                 return false;
@@ -161,7 +150,7 @@ public abstract class Robot {
                 move = rc.getLocation().directionTo(curr.location);
 
 
-            if (curr.location.equals(target) || Clock.getBytecodesLeft() < 1000) {
+            if (curr.location.equals(target) || Clock.getBytecodesLeft() < 1500) {
                 if (rc.canMove(move))
                     tryMove(move);
                 return;
@@ -280,5 +269,13 @@ public abstract class Robot {
                 spots.add(m);
         }
         return spots;
+    }
+
+    public int elevationDiff(MapLocation a, MapLocation b)throws GameActionException{
+        int ae = rc.senseElevation(a);
+        int be = rc.senseElevation(b);
+        if (ae > be)
+            return (ae-be);
+        return (be-ae);
     }
 }

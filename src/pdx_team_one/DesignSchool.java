@@ -4,7 +4,7 @@ import battlecode.common.*;
 public class DesignSchool extends Robot{
     int numLS = 0;
     int maxLS = 1;
-    private boolean secure;
+    private boolean droneHomeLocationSent;
     DesignSchool(RobotController r) throws GameActionException{
         super(r);
         for (; lastBlockRead < rc.getRoundNum(); lastBlockRead++)
@@ -14,10 +14,12 @@ public class DesignSchool extends Robot{
     public void takeTurn() throws GameActionException{
         for (; lastBlockRead < rc.getRoundNum(); lastBlockRead++)
             parseBlockchain(lastBlockRead);
-        if (!secure)
-            secure = checkSecure();
-        if (numLS < maxLS && rc.getTeamSoup() >= RobotType.REFINERY.cost)
+        if (numLS < maxLS && rc.getTeamSoup() >= RobotType.REFINERY.cost + 5)
             buildLS();
+        else if (numLS < 4 && rc.getTeamSoup() >= RobotType.VAPORATOR.cost + 5)
+            buildLS();
+        if (!droneHomeLocationSent)
+            droneHomeLocationSent = sendDroneHomeLocation();
     }
 
     int buildLS() throws GameActionException{
@@ -39,22 +41,30 @@ public class DesignSchool extends Robot{
                 if (t.getMessage()[1] == DEFENSE)
                     maxLS = 1;
                 else if (t.getMessage()[1] == START_PHASE_2)
-                    maxLS = 100000;
+                    maxLS = 10000;
+                else if (t.getMessage()[1] == VAPORATOR_BUILT)
+                    maxLS = 4;
             }
         }
         return res;
     }
 
-    public boolean checkSecure() throws GameActionException{
-        if (rc.senseElevation(rc.getLocation()) < 6) {
-            for (Direction dir : directions) {
-                if (rc.canSenseLocation(rc.getLocation().add(dir)) && rc.senseElevation(rc.getLocation().add(dir)) - rc.senseElevation(rc.getLocation()) < 3)
-                    return false;
+    public boolean sendDroneHomeLocation() throws GameActionException{
+        MapLocation ret = null;
+        for (Direction dir : directions) {
+            MapLocation m = rc.getLocation().add(dir).add(dir);
+            if (rc.onTheMap(m)){
+                if (ret == null)
+                    ret = m;
+                else if (rc.sensePollution(m) < rc.sensePollution(ret))
+                    ret = m;
             }
         }
-        int[] msg = new int[7];
+        int [] msg = new int[7];
         msg[0] = TEAM_ID;
-        msg[1] = DS_SECURE;
+        msg[1] = DRONE_HOME;
+        msg[2] = ret.x;
+        msg[3] = ret.y;
         return sendMessage(msg,DEFCON5);
     }
 }

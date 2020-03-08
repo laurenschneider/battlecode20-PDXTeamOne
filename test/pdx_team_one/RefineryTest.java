@@ -10,6 +10,7 @@ public class RefineryTest {
     RobotController rcMock = Mockito.mock(RobotController.class);
     Refinery testRef = new Refinery(rcMock);
 
+    /*
     @Test
     public void takeTurnTest() throws GameActionException {
         MapLocation loc = new MapLocation(1,2);
@@ -17,5 +18,5 @@ public class RefineryTest {
         Mockito.doReturn(loc).when(rcMock).getLocation();
         Mockito.doReturn(2).when(rcMock).sensePollution(loc);
         testRef.takeTurn();
-    }
+    }*/
 }

@@ -49,6 +49,8 @@ public abstract class Robot {
     static int enemyHQID = 0;
     static int lastBlockRead = 1;
 
+    static boolean constriction = false;
+
     //TEAM_ID here is changed here for debugging because I can't figure out how
     //to scrimmage against a different team locally
     public Robot(RobotController r) {
@@ -232,11 +234,47 @@ public abstract class Robot {
     }
 
     public HashSet<MapLocation> initInnerSpots(){
+        boolean left,right,upper,lower;
+        left = (HQ.x < 4);
+        right = (rc.getMapWidth() - HQ.x <= 4);
+        upper = (rc.getMapHeight() - HQ.y <= 4);
+        lower = (HQ.y < 4);
         HashSet<MapLocation> spots = new HashSet<>();
         for (Direction dir : corners) {
             if(rc.onTheMap(HQ.add(dir)))
                 spots.add(HQ.add(dir));
         }
+
+        if (((HQ.x == 3 && HQ.y == 36) || (HQ.x == 36 && HQ.y == 3)) && hqElevation == 5) {
+            constriction = true;
+            return spots;
+        }
+        System.out.println(HQ.x + " " + HQ.y + " " + hqElevation);
+        if (upper && !right && rc.onTheMap(HQ.translate(1,3)))
+            spots.add(HQ.translate(1,3));
+        if (upper && !left && rc.onTheMap(HQ.translate(-1,3)))
+            spots.add(HQ.translate(-1,3));
+        if (lower && !right && rc.onTheMap(HQ.translate(1,-3)))
+            spots.add(HQ.translate(1,-3));
+        if (lower && !left && rc.onTheMap(HQ.translate(-1,-3)))
+            spots.add(HQ.translate(-1,-3));
+        if (right && !upper && rc.onTheMap(HQ.translate(3,1)))
+            spots.add(HQ.translate(3,1));
+        if (right && !lower && rc.onTheMap(HQ.translate(3,-1)))
+            spots.add(HQ.translate(3,-1));
+        if (left && !upper && rc.onTheMap(HQ.translate(-3,1)))
+            spots.add(HQ.translate(-3,1));
+        if (left && !lower && rc.onTheMap(HQ.translate(-3,-1)))
+            spots.add(HQ.translate(-3,-1));
+
+        if (upper && right)
+            spots.remove(HQ.translate(1,1));
+        if (upper && left)
+            spots.remove(HQ.translate(-1,1));
+        if (lower && right)
+            spots.remove(HQ.translate(1, -1));
+        if (lower && left)
+            spots.remove(HQ.translate(-1, -1));
         return spots;
     }
 
@@ -251,10 +289,77 @@ public abstract class Robot {
             if (rc.onTheMap(m))
                 spots.add(m);
         }
+
+        if (((HQ.x == 3 && HQ.y == 36) || (HQ.x == 36 && HQ.y == 3)) && hqElevation == 5)
+            return spots;
+        boolean left,right,upper,lower;
+        left = (HQ.x < 4);
+        right = (rc.getMapWidth() - HQ.x <= 4);
+        upper = (rc.getMapHeight() - HQ.y <= 4);
+        lower = (HQ.y < 4);
+
+        //check left bounds
+        if(left) {
+            spots.remove(HQ.translate(-2, -1));
+            spots.remove(HQ.translate(-2, 0));
+            spots.remove(HQ.translate(-2, 1));
+            if (rc.onTheMap(HQ.translate(-3, -2)) && !lower)
+                spots.add(HQ.translate(-3, -2));
+            if (rc.onTheMap(HQ.translate(-3, 2)) && !upper)
+                spots.add(HQ.translate(-3, 2));
+        }
+
+        //check right bounds
+        if(right) {
+            spots.remove(HQ.translate(2, -1));
+            spots.remove(HQ.translate(2, 0));
+            spots.remove(HQ.translate(2, 1));
+            if (rc.onTheMap(HQ.translate(3, -2)) && !lower)
+                spots.add(HQ.translate(3, -2));
+            if (rc.onTheMap(HQ.translate(3, 2)) && !upper)
+                spots.add(HQ.translate(3, 2));
+        }
+
+
+        //check upper bounds
+        if(upper) {
+            spots.remove(HQ.translate(-1, 2));
+            spots.remove(HQ.translate(0, 2));
+            spots.remove(HQ.translate(1, 2));
+            if (rc.onTheMap(HQ.translate(-2, 3)) && !left)
+                spots.add(HQ.translate(-2, 3));
+            if (rc.onTheMap(HQ.translate(2, 3)) && !right)
+                spots.add(HQ.translate(2, 3));
+        }
+
+        //check lower bounds
+        if(lower) {
+            spots.remove(HQ.translate(-1, -2));
+            spots.remove(HQ.translate(0, -2));
+            spots.remove(HQ.translate(1, -2));
+            if (rc.onTheMap(HQ.translate(-2, -3)) && !left)
+                spots.add(HQ.translate(-2, -3));
+            if (rc.onTheMap(HQ.translate(2, -3)) && !right)
+                spots.add(HQ.translate(2, -3));
+        }
+
+        if (upper && right)
+            spots.remove(HQ.translate(2,2));
+        if (upper && left)
+            spots.remove(HQ.translate(-2,2));
+        if (lower && right)
+            spots.remove(HQ.translate(2,-2));
+        if (lower && left)
+            spots.remove(HQ.translate(-2,-2));
         return spots;
     }
 
     public HashSet<MapLocation> initOuterSpots() {
+        boolean left,right,upper,lower;
+        left = (HQ.x < 4);
+        right = (rc.getMapWidth() - HQ.x <= 4);
+        upper = (rc.getMapHeight() - HQ.y <= 4);
+        lower = (HQ.y < 4);
         HashSet<MapLocation> spots = new HashSet<>();
         MapLocation m;
         for (Direction dir : directions) {
@@ -267,6 +372,33 @@ public abstract class Robot {
             m = HQ.add(dir).add(dir).add(dir.rotateLeft());
             if (rc.onTheMap(m))
                 spots.add(m);
+        }
+
+        if (((HQ.x == 3 && HQ.y == 36) || (HQ.x == 36 && HQ.y == 3)) && hqElevation == 5)
+            return spots;
+        if(left) {
+            for (int i = -2; i <= 2; i++)
+                spots.remove(HQ.translate(-3, i));
+            if(lower)
+                spots.remove(HQ.translate(-3,-3));
+            if (upper)
+                spots.remove(HQ.translate(-3,3));
+        }
+        if(right) {
+            for (int i = -2; i <= 2; i++)
+                spots.remove(HQ.translate(3, i));
+            if(lower)
+                spots.remove(HQ.translate(3,-3));
+            if (upper)
+                spots.remove(HQ.translate(3,3));
+        }
+        if(upper) {
+            for (int i = -2; i <= 2; i++)
+                spots.remove(HQ.translate(i, 3));
+        }
+        if(lower) {
+            for (int i = -2; i <= 2; i++)
+                spots.remove(HQ.translate(i, -3));
         }
         return spots;
     }

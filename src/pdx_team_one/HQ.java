@@ -17,7 +17,9 @@ public class HQ extends Robot{
     private HashSet<MapLocation> wallSpots;
     int DSelevation = -100000;
     private ArrayDeque<Node> checkSpots = new ArrayDeque<>();
-    int phase = 0;
+    public boolean innerSpotsFilled;
+    public boolean wallSpotsFilled;
+    public Direction lastMinerBuilt = Direction.NORTHEAST;
 
     class Node{
         int moves;
@@ -33,6 +35,7 @@ public class HQ extends Robot{
     HQ(RobotController r) throws GameActionException{
         super(r);
         HQ = rc.getLocation();
+        hqElevation = rc.senseElevation(rc.getLocation());
         visited[HQ.x][HQ.y] = true;
         checkSpots.add(new Node(0,HQ));
         innerSpots = initInnerSpots();
@@ -44,9 +47,8 @@ public class HQ extends Robot{
         maxMiners = soup/500;
         if (maxMiners < 4)
             maxMiners = 4;
-        if (maxMiners > 6)
+        else if (maxMiners > 6)
             maxMiners = 6;
-
     }
 
     public void takeTurn() throws GameActionException {
@@ -56,7 +58,7 @@ public class HQ extends Robot{
             broadcastSoup(soups);
         }
         defense();
-        if (numMiners < maxMiners)
+        if (numMiners < maxMiners && rc.getTeamSoup() >= RobotType.MINER.cost)
             numMiners = buildMiners();
         if (!checkSpots.isEmpty())
             BFS(checkSpots.remove());
@@ -100,7 +102,7 @@ public class HQ extends Robot{
                 msg[4] = ds.x;
                 msg[5] = ds.y;
                 sendMessage(msg, DEFCON5);
-                System.out.println("DS: " + ds);
+                //System.out.println("DS: " + ds);
             }
             else{
                 //System.out.println("No suitable locations");
@@ -114,11 +116,15 @@ public class HQ extends Robot{
                 msg[4] = ds.x;
                 msg[5] = ds.y;
                 sendMessage(msg, DEFCON5);
+                maxMiners = 6;
             }
             strategy = true;
             //System.out.println("Ending with " + Clock.getBytecodesLeft());
         }
-        checkPhase();
+        if(!innerSpotsFilled)
+            checkInnerSpots();
+        if (!wallSpotsFilled)
+            checkWallSpots();
     }
 
     public boolean sendLocation() throws GameActionException {
@@ -133,14 +139,11 @@ public class HQ extends Robot{
     }
 
     public int buildMiners() throws GameActionException {
-        for (Direction dir : corners)
-            if (tryBuild(RobotType.MINER, dir))
-                return ++numMiners;
-        for (Direction dir : Direction.cardinalDirections())
-            if (tryBuild(RobotType.MINER, dir)) {
-                return ++numMiners;
-            }
-        return numMiners;
+        lastMinerBuilt = randomDirection();
+        while(!tryBuild(RobotType.MINER,lastMinerBuilt)){
+            lastMinerBuilt = randomDirection();
+        }
+        return ++numMiners;
     }
 
 
@@ -188,61 +191,31 @@ public class HQ extends Robot{
             BFS(checkSpots.remove());
     }
 
-    public void checkPhase() throws GameActionException{
-        if(phase == 0) {
-            for (Direction dir : directions) {
-                MapLocation m = HQ.add(dir);
-                if(rc.onTheMap(m)) {
-                    if (rc.canSenseLocation(m) && rc.senseRobotAtLocation(m) != null && rc.senseRobotAtLocation(m).type == RobotType.VAPORATOR) {
-                        int[] msg = new int[7];
-                        msg[0] = TEAM_ID;
-                        msg[1] = VAPORATOR_BUILT;
-                        if (sendMessage(msg, DEFCON5))
-                            phase++;
-                    }
-                }
-            }
+    public void checkInnerSpots() throws GameActionException {
+        for (MapLocation m : innerSpots) {
+            RobotInfo r = rc.senseRobotAtLocation(m);
+            if (r == null || r.type != RobotType.LANDSCAPER)
+                return;
         }
-        if (phase == 1){
-            for (MapLocation m : innerSpots){
-                RobotInfo r = rc.senseRobotAtLocation(m);
-                if (r== null || r.type!= RobotType.LANDSCAPER)
-                    return;
-            }
-           // System.out.println("Inner Spots filled");
-            int[] msg = new int[7];
-            msg[0] = TEAM_ID;
-            msg[1] = INNER_SPOTS_FILLED;
-            if(sendMessage(msg,DEFCON5))
-                phase++;
+        // System.out.println("Inner Spots filled");
+        int[] msg = new int[7];
+        msg[0] = TEAM_ID;
+        msg[1] = INNER_SPOTS_FILLED;
+        if (sendMessage(msg, DEFCON5))
+            innerSpotsFilled = true;
+    }
+
+    public void checkWallSpots() throws GameActionException {
+        for (MapLocation m : wallSpots) {
+            RobotInfo r = rc.senseRobotAtLocation(m);
+            if (r == null || r.type != RobotType.LANDSCAPER)
+                return;
         }
-        else if (phase == 2){
-            for (Direction dir: Direction.cardinalDirections()) {
-                if (rc.onTheMap(HQ.add(dir))) {
-                    RobotInfo r = rc.senseRobotAtLocation(HQ.add(dir));
-                    if (r == null || (r.type != RobotType.VAPORATOR && r.type != RobotType.NET_GUN))
-                        return;
-                }
-            }
-           // System.out.println("Starting phase 2");
-            int[] msg = new int[7];
-            msg[0] = TEAM_ID;
-            msg[1] = START_PHASE_2;
-            if(sendMessage(msg,DEFCON5))
-                phase++;
-        }
-        else if (phase == 3){
-            for (MapLocation m : wallSpots){
-                RobotInfo r = rc.senseRobotAtLocation(m);
-                if (r == null || r.type != RobotType.LANDSCAPER)
-                    return;
-            }
-            System.out.println("Wall Spots filled");
-            int[] msg = new int[7];
-            msg[0] = TEAM_ID;
-            msg[1] = WALL_SPOTS_FILLED;
-            if(sendMessage(msg,DEFCON5))
-                phase++;
-        }
+        System.out.println("Wall Spots filled");
+        int[] msg = new int[7];
+        msg[0] = TEAM_ID;
+        msg[1] = WALL_SPOTS_FILLED;
+        if (sendMessage(msg, DEFCON5))
+            wallSpotsFilled = true;
     }
 }

@@ -27,6 +27,12 @@ public class Miner extends Robot {
         super(r);
         for (; lastBlockRead < rc.getRoundNum(); lastBlockRead++)
             parseBlockchain(lastBlockRead);
+        for (RobotInfo ri : rc.senseNearbyRobots()){
+            if (ri.type == RobotType.HQ){
+                HQ = ri.location;
+                hqElevation = rc.senseElevation(HQ);
+            }
+        }
         innerSpots = initInnerSpots();
         if (rc.getRoundNum() == 3) {
             builder = true;

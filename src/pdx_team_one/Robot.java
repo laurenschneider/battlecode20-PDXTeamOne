@@ -1,6 +1,7 @@
 package pdx_team_one;
 import battlecode.common.*;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Map;
 
 //Parent class for all other robots
@@ -21,6 +22,10 @@ public abstract class Robot {
     static final int DS_SECURE = 11;
     static final int START_PHASE_2 = 12;
     static final int NEED_DELIVERY = 13;
+    static final int INNER_SPOTS_FILLED = 14;
+    static final int WALL_SPOTS_FILLED = 15;
+    static final int VAPORATOR_BUILT = 16;
+    static final int DRONE_HOME = 17;
 
     //message importance
     //HQ location
@@ -44,6 +49,8 @@ public abstract class Robot {
     static int enemyHQID = 0;
     static int lastBlockRead = 1;
 
+    static boolean constriction = false;
+
     //TEAM_ID here is changed here for debugging because I can't figure out how
     //to scrimmage against a different team locally
     public Robot(RobotController r) {
@@ -55,21 +62,6 @@ public abstract class Robot {
     }
 
     public abstract void takeTurn() throws GameActionException;
-
-    //strictly for debugging and measuring bytecode performance
-    static private int start, end, startturn, endturn;
-
-    static void start() {
-        start = Clock.getBytecodesLeft();
-        startturn = rc.getRoundNum();
-    }
-
-    static void end(String s) {
-        end = Clock.getBytecodesLeft();
-        endturn = rc.getRoundNum();
-        System.out.println("It took me " + (endturn - startturn) + " turns and " + (start - end) + " bytecodes to " + s);
-    }
-
 
     static Direction[] directions = {
             Direction.NORTH,
@@ -95,6 +87,8 @@ public abstract class Robot {
     }
 
     static boolean tryMove(Direction dir) throws GameActionException {
+        if(dir == Direction.CENTER)
+            return false;
         if (rc.isReady() && rc.canMove(dir)) {
             if (rc.senseFlooding(rc.adjacentLocation(dir)) && rc.getType() != RobotType.DELIVERY_DRONE)
                 return false;
@@ -158,7 +152,7 @@ public abstract class Robot {
                 move = rc.getLocation().directionTo(curr.location);
 
 
-            if (curr.location.equals(target) || Clock.getBytecodesLeft() < 1000) {
+            if (curr.location.equals(target) || Clock.getBytecodesLeft() < 1500) {
                 if (rc.canMove(move))
                     tryMove(move);
                 return;
@@ -237,5 +231,183 @@ public abstract class Robot {
         for (i = 0; i < soups.length && i < 5; i++)
             msg[i+2] = 100*soups[i].x + soups[i].y;
         return sendMessage(msg, DEFCON5);
+    }
+
+    public HashSet<MapLocation> initInnerSpots(){
+        boolean left,right,upper,lower;
+        left = (HQ.x < 4);
+        right = (rc.getMapWidth() - HQ.x <= 4);
+        upper = (rc.getMapHeight() - HQ.y <= 4);
+        lower = (HQ.y < 4);
+        HashSet<MapLocation> spots = new HashSet<>();
+        for (Direction dir : corners) {
+            if(rc.onTheMap(HQ.add(dir)))
+                spots.add(HQ.add(dir));
+        }
+
+        if (((HQ.x == 3 && HQ.y == 36) || (HQ.x == 36 && HQ.y == 3)) && hqElevation == 5) {
+            constriction = true;
+            return spots;
+        }
+        System.out.println(HQ.x + " " + HQ.y + " " + hqElevation);
+        if (upper && !right && rc.onTheMap(HQ.translate(1,3)))
+            spots.add(HQ.translate(1,3));
+        if (upper && !left && rc.onTheMap(HQ.translate(-1,3)))
+            spots.add(HQ.translate(-1,3));
+        if (lower && !right && rc.onTheMap(HQ.translate(1,-3)))
+            spots.add(HQ.translate(1,-3));
+        if (lower && !left && rc.onTheMap(HQ.translate(-1,-3)))
+            spots.add(HQ.translate(-1,-3));
+        if (right && !upper && rc.onTheMap(HQ.translate(3,1)))
+            spots.add(HQ.translate(3,1));
+        if (right && !lower && rc.onTheMap(HQ.translate(3,-1)))
+            spots.add(HQ.translate(3,-1));
+        if (left && !upper && rc.onTheMap(HQ.translate(-3,1)))
+            spots.add(HQ.translate(-3,1));
+        if (left && !lower && rc.onTheMap(HQ.translate(-3,-1)))
+            spots.add(HQ.translate(-3,-1));
+
+        if (upper && right)
+            spots.remove(HQ.translate(1,1));
+        if (upper && left)
+            spots.remove(HQ.translate(-1,1));
+        if (lower && right)
+            spots.remove(HQ.translate(1, -1));
+        if (lower && left)
+            spots.remove(HQ.translate(-1, -1));
+        return spots;
+    }
+
+    public HashSet<MapLocation> initWallSpots() {
+        HashSet<MapLocation> spots = new HashSet<>();
+        MapLocation m;
+        for (Direction dir : directions) {
+            m = HQ.add(dir).add(dir);
+            if (rc.onTheMap(m))
+                spots.add(m);
+            m = HQ.add(dir).add(dir.rotateRight());
+            if (rc.onTheMap(m))
+                spots.add(m);
+        }
+
+        if (((HQ.x == 3 && HQ.y == 36) || (HQ.x == 36 && HQ.y == 3)) && hqElevation == 5)
+            return spots;
+        boolean left,right,upper,lower;
+        left = (HQ.x < 4);
+        right = (rc.getMapWidth() - HQ.x <= 4);
+        upper = (rc.getMapHeight() - HQ.y <= 4);
+        lower = (HQ.y < 4);
+
+        //check left bounds
+        if(left) {
+            spots.remove(HQ.translate(-2, -1));
+            spots.remove(HQ.translate(-2, 0));
+            spots.remove(HQ.translate(-2, 1));
+            if (rc.onTheMap(HQ.translate(-3, -2)) && !lower)
+                spots.add(HQ.translate(-3, -2));
+            if (rc.onTheMap(HQ.translate(-3, 2)) && !upper)
+                spots.add(HQ.translate(-3, 2));
+        }
+
+        //check right bounds
+        if(right) {
+            spots.remove(HQ.translate(2, -1));
+            spots.remove(HQ.translate(2, 0));
+            spots.remove(HQ.translate(2, 1));
+            if (rc.onTheMap(HQ.translate(3, -2)) && !lower)
+                spots.add(HQ.translate(3, -2));
+            if (rc.onTheMap(HQ.translate(3, 2)) && !upper)
+                spots.add(HQ.translate(3, 2));
+        }
+
+
+        //check upper bounds
+        if(upper) {
+            spots.remove(HQ.translate(-1, 2));
+            spots.remove(HQ.translate(0, 2));
+            spots.remove(HQ.translate(1, 2));
+            if (rc.onTheMap(HQ.translate(-2, 3)) && !left)
+                spots.add(HQ.translate(-2, 3));
+            if (rc.onTheMap(HQ.translate(2, 3)) && !right)
+                spots.add(HQ.translate(2, 3));
+        }
+
+        //check lower bounds
+        if(lower) {
+            spots.remove(HQ.translate(-1, -2));
+            spots.remove(HQ.translate(0, -2));
+            spots.remove(HQ.translate(1, -2));
+            if (rc.onTheMap(HQ.translate(-2, -3)) && !left)
+                spots.add(HQ.translate(-2, -3));
+            if (rc.onTheMap(HQ.translate(2, -3)) && !right)
+                spots.add(HQ.translate(2, -3));
+        }
+
+        if (upper && right)
+            spots.remove(HQ.translate(2,2));
+        if (upper && left)
+            spots.remove(HQ.translate(-2,2));
+        if (lower && right)
+            spots.remove(HQ.translate(2,-2));
+        if (lower && left)
+            spots.remove(HQ.translate(-2,-2));
+        return spots;
+    }
+
+    public HashSet<MapLocation> initOuterSpots() {
+        boolean left,right,upper,lower;
+        left = (HQ.x < 4);
+        right = (rc.getMapWidth() - HQ.x <= 4);
+        upper = (rc.getMapHeight() - HQ.y <= 4);
+        lower = (HQ.y < 4);
+        HashSet<MapLocation> spots = new HashSet<>();
+        MapLocation m;
+        for (Direction dir : directions) {
+            m = HQ.add(dir).add(dir).add(dir);
+            if (rc.onTheMap(m))
+                spots.add(m);
+            m = HQ.add(dir).add(dir).add(dir.rotateRight());
+            if (rc.onTheMap(m))
+                spots.add(m);
+            m = HQ.add(dir).add(dir).add(dir.rotateLeft());
+            if (rc.onTheMap(m))
+                spots.add(m);
+        }
+
+        if (((HQ.x == 3 && HQ.y == 36) || (HQ.x == 36 && HQ.y == 3)) && hqElevation == 5)
+            return spots;
+        if(left) {
+            for (int i = -2; i <= 2; i++)
+                spots.remove(HQ.translate(-3, i));
+            if(lower)
+                spots.remove(HQ.translate(-3,-3));
+            if (upper)
+                spots.remove(HQ.translate(-3,3));
+        }
+        if(right) {
+            for (int i = -2; i <= 2; i++)
+                spots.remove(HQ.translate(3, i));
+            if(lower)
+                spots.remove(HQ.translate(3,-3));
+            if (upper)
+                spots.remove(HQ.translate(3,3));
+        }
+        if(upper) {
+            for (int i = -2; i <= 2; i++)
+                spots.remove(HQ.translate(i, 3));
+        }
+        if(lower) {
+            for (int i = -2; i <= 2; i++)
+                spots.remove(HQ.translate(i, -3));
+        }
+        return spots;
+    }
+
+    public int elevationDiff(MapLocation a, MapLocation b)throws GameActionException{
+        int ae = rc.senseElevation(a);
+        int be = rc.senseElevation(b);
+        if (ae > be)
+            return (ae-be);
+        return (be-ae);
     }
 }

@@ -15,10 +15,10 @@ public strictfp class RobotPlayer {
 
         Robot bot = null;
 
-        System.out.println("I'm a " + rc.getType() + " and I just got created!");
+        //System.out.println("I'm a " + rc.getType() + " and I just got created!");
         // Try/catch blocks stop unhandled exceptions, which cause your robot to explode
         try {
-            System.out.println("I'm a " + rc.getType() + "! Location " + rc.getLocation());
+            //System.out.println("I'm a " + rc.getType() + "! Location " + rc.getLocation());
             switch (rc.getType()) {
                 case HQ:
                     bot = new HQ(rc);
@@ -50,7 +50,7 @@ public strictfp class RobotPlayer {
             }
 
         } catch (Exception e) {
-            System.out.println(rc.getType() + " Exception");
+            //System.out.println(rc.getType() + " Exception");
             e.printStackTrace();
         }
 
@@ -59,7 +59,7 @@ public strictfp class RobotPlayer {
                 bot.takeTurn();
                 Clock.yield();
             } catch (Exception e) {
-                System.out.println(rc.getType() + " Exception");
+                //System.out.println(rc.getType() + " Exception");
                 e.printStackTrace();
             }
         }

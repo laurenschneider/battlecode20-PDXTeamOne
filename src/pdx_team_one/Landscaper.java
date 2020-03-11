@@ -146,15 +146,26 @@ public class Landscaper extends Robot {
 
 
     public void defend()throws GameActionException {
+        MapLocation current = rc.getLocation();
+
+        if (rc.getDirtCarrying() > 0){
+            for (RobotInfo r : rc.senseNearbyRobots(-1,rc.getTeam().opponent())){
+                if (r.type == RobotType.NET_GUN && current.isAdjacentTo(r.location)){
+                    if (tryDeposit(current.directionTo(r.location)))
+                        return;
+                }
+            }
+        }
+
         if (!ds_secure)
             secureDS();
         if (!ds_secure)
             return;
         if(rc.getRoundNum()> 1000)
             startDump = true;
-        MapLocation current = rc.getLocation();
+
         if (!landSpots.contains(current)) {
-            //System.out.println("I'm not in position yet");
+            ////System.out.println("I'm not in position yet");
             if (!startDump && !innerSpots.isEmpty()) {
                 ArrayList<MapLocation> toRemove = new ArrayList<>();
                 MapLocation target = null;
@@ -185,7 +196,7 @@ public class Landscaper extends Robot {
             }
             */
         } else if (startDump && rc.getDirtCarrying() > 0) {
-          //  System.out.println("Let's start dumping");
+          //  //System.out.println("Let's start dumping");
             MapLocation dump = null;
             ArrayList<MapLocation> toRemove = new ArrayList<>();
             for (MapLocation d : dumpSpots) {
@@ -204,7 +215,7 @@ public class Landscaper extends Robot {
             if (dump != null && tryDeposit(current.directionTo(dump)))
                 return;
         } else if (!startDump && !innerSpots.contains(rc.getLocation())) {
-           // System.out.println("Not in an inner spot, gotta get to one");
+           // //System.out.println("Not in an inner spot, gotta get to one");
             ArrayList<MapLocation> toRemove = new ArrayList<>();
             for (MapLocation m : innerSpots) {
                 if (rc.canSenseLocation(m)) {
@@ -220,7 +231,7 @@ public class Landscaper extends Robot {
             }
         } else if (!startDump && rc.getDirtCarrying() > 0) {
             //MapLocation[] soups = rc.senseNearbySoup();
-          //  System.out.println("Let's start the initial wall");
+          //  //System.out.println("Let's start the initial wall");
             MapLocation dump = null;
             ArrayList<MapLocation> toRemove = new ArrayList<>();
             for (MapLocation d : firstDump) {
@@ -309,11 +320,11 @@ public class Landscaper extends Robot {
             return;
         ArrayList<MapLocation> toRemove = new ArrayList<>();
          if (rc.getDirtCarrying() > 0) {
-        //     System.out.println("Gonna try and dump");
+        //     //System.out.println("Gonna try and dump");
              for (int i =0; waterLevel[i] < rc.senseElevation(rc.getLocation()); i++){
              }
              for (MapLocation m : dsdumpSpots) {
-             //    System.out.println("Checking dsdumpspot " + m);
+             //    //System.out.println("Checking dsdumpspot " + m);
                  if (rc.canSenseLocation(m) && rc.senseElevation(m) - dsElevation < 3) {
                      if (rc.getLocation().isAdjacentTo(m) && tryDeposit(rc.getLocation().directionTo(m)))
                          return;
@@ -323,7 +334,7 @@ public class Landscaper extends Robot {
              }
          }
         else{
-         //   System.out.println("it's digging time");
+         //   //System.out.println("it's digging time");
             for (Direction dir : directions){
                 if(digSpots.contains(rc.getLocation().add(dir)))
                     if (tryDig(dir))

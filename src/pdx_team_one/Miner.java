@@ -12,7 +12,7 @@ public class Miner extends Robot {
     private static Direction scoutPath = randomDirection();
     public static Queue<MapLocation> vaporators;
     public static Queue<MapLocation> netGuns;
-    public static MapLocation fc = null, ds = null;
+    public static MapLocation fc = null, ds = null, ng = null;
     public static MapLocation pickup = null;
     public static boolean attack;
     public static HashSet<MapLocation> wall;
@@ -22,6 +22,7 @@ public class Miner extends Robot {
     public int LS;
     private HashSet<MapLocation> innerSpots;
     private HashSet<MapLocation> outerSpots;
+    private boolean DSNetGun;
 
     Miner(RobotController r) throws GameActionException {
         super(r);
@@ -142,19 +143,19 @@ public class Miner extends Robot {
             return doMinerThings(soups);
         }
         if (!design_school && rc.getTeamSoup() >= RobotType.DESIGN_SCHOOL.cost) {
-            System.out.println("let's build a design school");//let's build shit
+            //System.out.println("let's build a design school");//let's build shit
             buildDesignSchool();
             return 6;
         } else if (!fulfillment_center && design_school && rc.getTeamSoup() >= RobotType.FULFILLMENT_CENTER.cost) {
-            System.out.println("let's build a fulfillment center");//let's build shit
+            //System.out.println("let's build a fulfillment center");//let's build shit
             buildFulfillmentCenter();
             return 4;
         } else if (design_school && !vaporators.isEmpty() && rc.getTeamSoup() >= RobotType.VAPORATOR.cost) {
-            System.out.println("let's build vaporators");//let's build shit
+            //System.out.println("let's build vaporators");//let's build shit
             buildVaporator();
             return 1;
         } else if (vaporators.isEmpty() && !netGuns.isEmpty() && rc.getTeamSoup() >= RobotType.NET_GUN.cost) {
-            System.out.println("let's build net guns");//let's build shit
+            //System.out.println("let's build net guns");//let's build shit
             buildNetGun();
             return 7;
         } else if (buildNetGuns && netGuns.isEmpty() && vaporators.isEmpty()) {
@@ -171,7 +172,7 @@ public class Miner extends Robot {
         } else if (rc.getSoupCarrying() > 0) {
             findRefinery(soups);
             return 8;
-        } else /*if (wall.contains(rc.getLocation()))*/
+        } else if (DSNetGun)/*if (wall.contains(rc.getLocation()))*/
             builderMove();
         //else
           //  pathTo(HQ);
@@ -284,7 +285,7 @@ public class Miner extends Robot {
                     res = 5;
                 } else if (t.getMessage()[1] == ATTACK) {
                     attack = true;
-                    System.out.println(HQ);
+                    //System.out.println(HQ);
                     fc = HQ.add(Direction.NORTH);
                     ds = HQ.add(Direction.SOUTH);
                 } else if (t.getMessage()[1] == DEFENSE) {
@@ -344,7 +345,7 @@ public class Miner extends Robot {
 
     private void scout() throws GameActionException {
         if (rc.isReady()) {
-            while (!tryMove(scoutPath))
+            while (Clock.getBytecodesLeft() > 500 && !tryMove(scoutPath))
                 scoutPath = randomDirection();
         }
     }
@@ -367,6 +368,16 @@ public class Miner extends Robot {
             if (d== null)
                 scout();
             else if (tryBuild(RobotType.DESIGN_SCHOOL,d)){
+                ds = rc.getLocation().add(d);
+                int []msg = new int[7];
+                msg[0] = TEAM_ID;
+                msg[1] = DEFENSE;
+                msg[2] = fc.x;
+                msg[3] = fc.y;
+                msg[4] = ds.x;
+                msg[5] = ds.y;
+                sendMessage(msg, DEFCON5);
+                ////System.out.println("DS: " + ds);
                 design_school = true;
                 turnsStuck = 0;
                 return true;
@@ -407,6 +418,15 @@ public class Miner extends Robot {
             if (d== null)
                 scout();
             else if (tryBuild(RobotType.FULFILLMENT_CENTER,d)){
+                fc = rc.getLocation().add(d);
+                int []msg = new int[7];
+                msg[0] = TEAM_ID;
+                msg[1] = DEFENSE;
+                msg[2] = fc.x;
+                msg[3] = fc.y;
+                msg[4] = ds.x;
+                msg[5] = ds.y;
+                sendMessage(msg, DEFCON5);
                 fulfillment_center = true;
                 turnsStuck = 0;
                 return true;
@@ -458,6 +478,89 @@ public class Miner extends Robot {
     }
 
     private boolean buildNetGun() throws GameActionException {
+        if (!DSNetGun){
+            if (ng != null && rc.getLocation().isAdjacentTo(ng)){
+                if (tryBuild(RobotType.NET_GUN,rc.getLocation().directionTo(ng))){
+                    DSNetGun = true;
+                    return true;
+                }
+                else{
+                    for (Direction dir : directions){
+                        MapLocation m = rc.getLocation().add(dir);
+                        if (rc.onTheMap(m) && (m.x == 0 || m.y == 0 || m.x == rc.getMapWidth() - 1 || m.y == rc.getMapHeight() - 1)){
+                            if (tryBuild(RobotType.NET_GUN,dir)){
+                                DSNetGun = true;
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+            }
+            else if (rc.getLocation().isAdjacentTo(ds)){
+                MapLocation ngadj = null;
+                for (Direction dir : directions){
+                    MapLocation m = ds.add(dir);
+                    if (rc.onTheMap(m) && !outerSpots.contains(m) && !m.equals(fc)){
+                        for (Direction dir2: directions){
+                            MapLocation m2 = m.add(dir2);
+                            if (rc.onTheMap(m2) && !ds.equals(m2) && elevationDiff(m,m2) <= 3) {
+                                if (ng == null) {
+                                    ng = m;
+                                    ngadj = m2;
+                                }
+                                else if (m.distanceSquaredTo(HQ) > ng.distanceSquaredTo(HQ)) {
+                                    ng = m;
+                                    ngadj = m2;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (ng == null) {
+                    //System.out.println("Can't find a ng spot. This should never happen");
+                    rc.resign();
+                    return false;
+                }
+                //System.out.println(ng + " is the ideal DSNetGun location");
+                if (!rc.getLocation().isAdjacentTo(ng)) {
+                    if (rc.getLocation().isAdjacentTo(ngadj) && tryMove(rc.getLocation().directionTo(ngadj)))
+                        return false;
+                    if (pickup == null || pickup != rc.getLocation()) {
+                        if (askForDrone(ngadj))
+                            pickup = rc.getLocation();
+                    }
+                }
+                else if (rc.getLocation().equals(ng)){
+                    for (Direction dir : directions){
+                        if (rc.getLocation().add(dir).isAdjacentTo(ds) && !rc.getLocation().add(dir).equals(ds))
+                            if(tryMove(dir))
+                                return false;
+                    }
+                }
+                else if (tryBuild(RobotType.NET_GUN,rc.getLocation().directionTo(ng))){
+                    DSNetGun = true;
+                    return true;
+                }
+                else{
+                    for (Direction dir : directions){
+                        MapLocation m = rc.getLocation().add(dir);
+                        if (rc.onTheMap(m) && (m.x == 0 || m.y == 0 || m.x == rc.getMapWidth() - 1 || m.y == rc.getMapHeight() - 1)){
+                            if (tryBuild(RobotType.NET_GUN,dir)){
+                                DSNetGun = true;
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            else if (pickup == null || pickup != rc.getLocation()) {
+                if (askForDrone(ds))
+                    pickup = rc.getLocation();
+            }
+            return false;
+        }
         for (MapLocation m : netGuns) {
             if (!rc.getLocation().equals(m) && rc.getLocation().isAdjacentTo(m)) {
                 if (tryBuild(RobotType.NET_GUN, rc.getLocation().directionTo(m))) {
@@ -507,7 +610,7 @@ public class Miner extends Robot {
                         if (!innerSpots.contains(m) && rc.senseRobotAtLocation(m) == null && elevationDiff(m, target) < elevationDiff(adj, target))
                             adj = m;
                     }
-                   // System.out.println(adj + " is the best spot for me to build from");
+                   // //System.out.println(adj + " is the best spot for me to build from");
                     if (!adj.equals(rc.getLocation()) && askForDrone(adj)) {
                         pickup = rc.getLocation();
                         return;
@@ -534,7 +637,7 @@ public class Miner extends Robot {
                     }
                 }
                 if (adj != null &&!adj.equals(rc.getLocation()) && askForDrone(adj)) {
-                    System.out.println(adj + " is the best spot for me to build from");
+                    //System.out.println(adj + " is the best spot for me to build from");
                     pickup = rc.getLocation();
                     return;
                 }
@@ -624,7 +727,7 @@ public class Miner extends Robot {
         }
         else if (phase == 1){
             if(netGuns.isEmpty()) {
-                // System.out.println("Starting phase 2");
+                // //System.out.println("Starting phase 2");
                 int[] msg = new int[7];
                 msg[0] = TEAM_ID;
                 msg[1] = START_PHASE_2;

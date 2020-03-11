@@ -181,7 +181,7 @@ public abstract class Robot {
         }
     }
     //returns whether it's possible to move from point a to point b
-    static private boolean canTraverse(MapLocation a, MapLocation b, MapLocation target) throws GameActionException {
+    static public boolean canTraverse(MapLocation a, MapLocation b, MapLocation target) throws GameActionException {
         if (!rc.onTheMap(b))
             return false;
         if (!rc.canSenseLocation(a) || !rc.canSenseLocation(b))
@@ -200,9 +200,10 @@ public abstract class Robot {
             if (rc.canShootUnit(e.ID)) {
                 if (target == null)
                     target = e;
-                else if (target.isCurrentlyHoldingUnit() == e.isCurrentlyHoldingUnit())
-                    if (e.location.equals(closestLocation(new MapLocation[] {e.location,target.location})))
+                else if (target.isCurrentlyHoldingUnit() == e.isCurrentlyHoldingUnit()) {
+                    if (e.location.equals(closestLocation(new MapLocation[]{e.location, target.location})))
                         target = e;
+                }
                 else if (e.isCurrentlyHoldingUnit())
                     target = e;
             }
@@ -249,7 +250,7 @@ public abstract class Robot {
             constriction = true;
             return spots;
         }
-        System.out.println(HQ.x + " " + HQ.y + " " + hqElevation);
+        //System.out.println(HQ.x + " " + HQ.y + " " + hqElevation);
         if (upper && !right && rc.onTheMap(HQ.translate(1,3)))
             spots.add(HQ.translate(1,3));
         if (upper && !left && rc.onTheMap(HQ.translate(-1,3)))

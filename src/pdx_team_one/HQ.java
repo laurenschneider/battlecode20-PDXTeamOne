@@ -15,6 +15,7 @@ public class HQ extends Robot{
     private HashSet<MapLocation> fcSpots = new HashSet<>();
     private HashSet<MapLocation> innerSpots;
     private HashSet<MapLocation> wallSpots;
+    private HashSet<MapLocation> outerSpots;
     int DSelevation = -100000;
     private ArrayDeque<Node> checkSpots = new ArrayDeque<>();
     public boolean innerSpotsFilled;
@@ -40,6 +41,7 @@ public class HQ extends Robot{
         checkSpots.add(new Node(0,HQ));
         innerSpots = initInnerSpots();
         wallSpots = initWallSpots();
+        outerSpots = initOuterSpots();
         int soup = 0;
 
         for (MapLocation m : rc.senseNearbySoup())
@@ -63,7 +65,7 @@ public class HQ extends Robot{
         if (!checkSpots.isEmpty())
             BFS(checkSpots.remove());
         else if (!strategy && Clock.getBytecodesLeft() > 15000){
-            System.out.println("Starting with " + Clock.getBytecodesLeft());
+            //System.out.println("Starting with " + Clock.getBytecodesLeft());
             MapLocation[] corners = new MapLocation[4];
             corners[0] = new MapLocation(0,0);
             corners[1] = new MapLocation(0,rc.getMapHeight());
@@ -102,10 +104,10 @@ public class HQ extends Robot{
                 msg[4] = ds.x;
                 msg[5] = ds.y;
                 sendMessage(msg, DEFCON5);
-                //System.out.println("DS: " + ds);
+                ////System.out.println("DS: " + ds);
             }
             else{
-                //System.out.println("No suitable locations");
+                ////System.out.println("No suitable locations");
                 ds = HQ.add(Direction.NORTH).add(Direction.NORTH).add(Direction.NORTH);
                 fc = HQ.add(Direction.NORTH).add(Direction.NORTH).add(Direction.NORTHEAST);
                 int[] msg = new int[7];
@@ -119,7 +121,7 @@ public class HQ extends Robot{
                 maxMiners = 6;
             }
             strategy = true;
-            //System.out.println("Ending with " + Clock.getBytecodesLeft());
+            ////System.out.println("Ending with " + Clock.getBytecodesLeft());
         }
         if(!innerSpotsFilled)
             checkInnerSpots();
@@ -150,7 +152,7 @@ public class HQ extends Robot{
     public boolean evaluate(MapLocation m)throws GameActionException {
         if (!rc.canSenseLocation(m))
             return false;
-        if (HQ.distanceSquaredTo(m) <= 13 || HQ.distanceSquaredTo(m) == 18)
+        if(outerSpots.contains(m) || wallSpots.contains(m) || innerSpots.contains(m))
             return false;
         int spots = 0;
         for (Direction dir : directions) {
@@ -197,7 +199,7 @@ public class HQ extends Robot{
             if (r == null || r.type != RobotType.LANDSCAPER)
                 return;
         }
-        // System.out.println("Inner Spots filled");
+        // //System.out.println("Inner Spots filled");
         int[] msg = new int[7];
         msg[0] = TEAM_ID;
         msg[1] = INNER_SPOTS_FILLED;
@@ -211,7 +213,7 @@ public class HQ extends Robot{
             if (r == null || r.type != RobotType.LANDSCAPER)
                 return;
         }
-        System.out.println("Wall Spots filled");
+        //System.out.println("Wall Spots filled");
         int[] msg = new int[7];
         msg[0] = TEAM_ID;
         msg[1] = WALL_SPOTS_FILLED;

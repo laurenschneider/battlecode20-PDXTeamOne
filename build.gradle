@@ -212,6 +212,7 @@ task run(type: JavaExec, dependsOn: 'build') {
         '-Dbc.server.save-file=' +project.property('replay')
     ]
 }
+
 task runFromClient(type: JavaExec, dependsOn: 'build') {
     main = 'battlecode.server.Main'
     classpath = project.sourceSets.main.runtimeClasspath
@@ -237,7 +238,6 @@ task runDebug(type: JavaExec, dependsOn: 'build') {
     classpath = project.sourceSets.main.runtimeClasspath
     args = ['-c=-']
     jvmArgs = [
-            '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005',
             '-Dbc.server.mode=headless',
             '-Dbc.server.map-path=maps',
             '-Dbc.server.debug=false',
@@ -247,7 +247,7 @@ task runDebug(type: JavaExec, dependsOn: 'build') {
             '-Dbc.game.team-b='+project.property('teamB'),
             '-Dbc.game.team-a.url='+project.property('classLocation'),
             '-Dbc.game.team-b.url='+project.property('classLocation'),
-            '-Dbc.game.maps='+project.property('maps'),
+            '-Dbc.game.maps=ALandDivided'+project.property('maps'),
             '-Dbc.server.save-file=' + project.property('replay')
     ]
 }

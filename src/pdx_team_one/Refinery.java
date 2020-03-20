@@ -1,12 +1,15 @@
 package pdx_team_one;
 import battlecode.common.*;
 
-public class Refinery extends Robot{
-    int usage = 0;
+//the refinery refines soup automatically, not much to do here
+public class Refinery extends Building{
+    private int usage = 0;
     Refinery(RobotController r) {
         super(r);
     }
-    public void takeTurn() throws GameActionException {
+
+    //if no one has come near the refinery in a while and there's no soup nearby, then just disintegrate
+    public void takeTurn() {
         if (usage >= 100)
             rc.disintegrate();
         MapLocation[] soups = rc.senseNearbySoup();

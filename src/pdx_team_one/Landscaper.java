@@ -1,27 +1,24 @@
 package pdx_team_one;
 import battlecode.common.*;
-
-import java.nio.file.Paths;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.HashSet;
 
-public class Landscaper extends Robot {
+//the Landscaper digs dirt and builds walls
+public class Landscaper extends Unit {
 
     private HashSet<MapLocation> dumpSpots = new HashSet<>();
     private HashSet<MapLocation> landSpots = new HashSet<>();
     private HashSet<MapLocation> innerSpots;
     private HashSet<MapLocation> outerSpots;
     private HashSet<MapLocation> digSpots = new HashSet<>();
-    private HashSet<MapLocation> dsdumpSpots = new HashSet<>();
+    private HashSet<MapLocation> dsDumpSpots = new HashSet<>();
     private HashSet<MapLocation> firstDump = new HashSet<>();
-    public boolean startDump;
-    public boolean ds_secure;
+    private boolean startDump;
+    private boolean ds_secure;
     private MapLocation fc = null, ds = null;
-    public int dsElevation;
-    int outerWallHeight = 100;
-    int[] waterLevel = new int[]{0,256,464,677,930,1210,50000};
+    private int dsElevation;
+    private int[] waterLevel = new int[]{0,256,464,677,930,1210,50000};
 
+    //initializes all the landing and dumping spots
     Landscaper(RobotController r) throws GameActionException {
         super(r);
         for (RobotInfo ri : rc.senseNearbyRobots(-1, rc.getTeam())) {
@@ -36,11 +33,11 @@ public class Landscaper extends Robot {
             parseBlockchain(lastBlockRead);
         for (Direction dir : directions) {
             if (rc.onTheMap(ds.add(dir)) && !fc.equals(ds.add(dir))) {
-                dsdumpSpots.add(ds.add(dir));
+                dsDumpSpots.add(ds.add(dir));
             }
             if (fc.isAdjacentTo(ds)) {
                 if (rc.onTheMap(fc.add(dir)) && !ds.equals(fc.add(dir)))
-                    dsdumpSpots.add(fc.add(dir));
+                    dsDumpSpots.add(fc.add(dir));
             }
             if (rc.onTheMap(ds.add(dir).add(dir)))
                 digSpots.add(ds.add(dir).add(dir));
@@ -64,7 +61,7 @@ public class Landscaper extends Robot {
         digSpots.remove(fc);
         digSpots.remove(ds);
         digSpots.removeAll(dumpSpots);
-        digSpots.removeAll(dsdumpSpots);
+        digSpots.removeAll(dsDumpSpots);
 
         dumpSpots.remove(ds);
         dumpSpots.remove(fc);
@@ -121,42 +118,60 @@ public class Landscaper extends Robot {
         defend();
     }
 
+    //get the latest hot goss
     public void parseBlockchain(int num) throws GameActionException {
         for (Transaction t : rc.getBlock(num)) {
             if (t.getMessage()[0] == TEAM_ID) {
-                if (t.getMessage()[1] == HQ_LOCATION) {
-                    HQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
-                    hqElevation = t.getMessage()[5];
-                } else if (t.getMessage()[1] == ENEMY_HQ_FOUND) {
-                    enemyHQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
-                    t.getMessage()[4] = enemyHQID;
-                } else if (t.getMessage()[1] == DEFENSE) {
-                    if (fc == null)
-                        fc = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
-                    if (ds == null)
-                        ds = new MapLocation(t.getMessage()[4], t.getMessage()[5]);
-                } else if (t.getMessage()[1] == DS_SECURE) {
-                    ds_secure = true;
-                } else if (t.getMessage()[1] == START_PHASE_2) {
-                    startDump = true;
+                switch (t.getMessage()[1]) {
+                    case HQ_LOCATION:
+                        HQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
+                        hqElevation = t.getMessage()[5];
+                        break;
+                    case DEFENSE:
+                        if (fc == null)
+                            fc = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
+                        if (ds == null)
+                            ds = new MapLocation(t.getMessage()[4], t.getMessage()[5]);
+                        break;
+                    case DS_SECURE:
+                        ds_secure = true;
+                        break;
+                    case START_PHASE_2:
+                        startDump = true;
+                        break;
                 }
             }
         }
     }
 
+    //the main driver function
+    public void defend() throws GameActionException {
+        MapLocation current = rc.getLocation();
 
-    public void defend()throws GameActionException {
+        //if we're holding dirt and happen to be next to an enemy netgun, then dump on it
+        if (rc.getDirtCarrying() > 0){
+            for (RobotInfo r : rc.senseNearbyRobots(-1,rc.getTeam().opponent())){
+                if (r.type == RobotType.NET_GUN && current.isAdjacentTo(r.location)){
+                    if (tryDeposit(current.directionTo(r.location)))
+                        return;
+                }
+            }
+        }
+
+        //secure the design school first and foremost
         if (!ds_secure)
             secureDS();
         if (!ds_secure)
             return;
+
+        //we wait to build the wall until we get the signal, but after turn 1000 we don't have time to wait anymore
         if(rc.getRoundNum()> 1000)
             startDump = true;
-        MapLocation current = rc.getLocation();
+
+        //if we're not in position, we need to either get in position or dig in place until a drone picks us up
         if (!landSpots.contains(current)) {
-            //System.out.println("I'm not in position yet");
             if (!startDump && !innerSpots.isEmpty()) {
-                ArrayList<MapLocation> toRemove = new ArrayList<>();
+                HashSet<MapLocation> toRemove = new HashSet<>();
                 MapLocation target = null;
                 for (MapLocation m : innerSpots) {
                     if (rc.canSenseLocation(m)) {
@@ -176,21 +191,14 @@ public class Landscaper extends Robot {
                 else if (!innerSpots.isEmpty())
                     pathTo(closestLocation(innerSpots.toArray(new MapLocation[0])));
 
-            }/*
-            if (rc.isReady() && Clock.getBytecodesLeft() > 500) {
-                for (MapLocation d : digSpots) {
-                    if (rc.canSenseLocation(d) && rc.getLocation().isAdjacentTo(d) && tryDig(rc.getLocation().directionTo(d)))
-                        return;
-                }
             }
-            */
+        //if we have dirt and can start dumping, then pick the lowest adjacent dump spot and dump
         } else if (startDump && rc.getDirtCarrying() > 0) {
-          //  System.out.println("Let's start dumping");
             MapLocation dump = null;
-            ArrayList<MapLocation> toRemove = new ArrayList<>();
+            HashSet<MapLocation> toRemove = new HashSet<>();
             for (MapLocation d : dumpSpots) {
                 if (rc.canSenseLocation(d) && current.isAdjacentTo(d)) {
-                    if (outerSpots.contains(d) && (rc.senseElevation(d) > outerWallHeight))
+                    if (outerSpots.contains(d) && (rc.senseElevation(d) > 100))
                         toRemove.add(d);
                     else if (rc.senseElevation(d) < -1000)
                         toRemove.add(d);
@@ -203,9 +211,9 @@ public class Landscaper extends Robot {
             dumpSpots.removeAll(toRemove);
             if (dump != null && tryDeposit(current.directionTo(dump)))
                 return;
+        //if we haven't received the signal yet, then move to the middle
         } else if (!startDump && !innerSpots.contains(rc.getLocation())) {
-           // System.out.println("Not in an inner spot, gotta get to one");
-            ArrayList<MapLocation> toRemove = new ArrayList<>();
+            HashSet<MapLocation> toRemove = new HashSet<>();
             for (MapLocation m : innerSpots) {
                 if (rc.canSenseLocation(m)) {
                     RobotInfo r = rc.senseRobotAtLocation(m);
@@ -218,21 +226,18 @@ public class Landscaper extends Robot {
                 pathTo(closestLocation(innerSpots.toArray(new MapLocation[0])));
                 return;
             }
+        //if we haven't received the signal but we're already in the middle, then start the initial wall
         } else if (!startDump && rc.getDirtCarrying() > 0) {
-            //MapLocation[] soups = rc.senseNearbySoup();
-          //  System.out.println("Let's start the initial wall");
             MapLocation dump = null;
-            ArrayList<MapLocation> toRemove = new ArrayList<>();
+            HashSet<MapLocation> toRemove = new HashSet<>();
             for (MapLocation d : firstDump) {
-                if (!rc.canSenseLocation(d))
-                    toRemove.add(d);
-                else if (!d.isAdjacentTo(current))
+                //remove spots we're not adjacent to and/or spots with buildings on them
+                if (!d.isAdjacentTo(current))
                     toRemove.add(d);
                 else if (rc.senseRobotAtLocation(d) != null && (rc.senseRobotAtLocation(d).type == RobotType.VAPORATOR || rc.senseRobotAtLocation(d).type == RobotType.NET_GUN))
                     toRemove.add(d);
-                /*
-                else if (soups.length > 0 && (rc.senseElevation(d) - rc.senseElevation(HQ) >= 3))
-                    continue;*/
+                //we need to make sure the wall is at least 6 before worrying about making sure the future net gun
+                //and vaporator spots are level
                 else if (d.isAdjacentTo(HQ) && rc.senseElevation(d) < rc.senseElevation (HQ.add(HQ.directionTo(d)).add(HQ.directionTo(d)))){
                     Direction dir = HQ.directionTo(current);
                     if (rc.senseElevation(current.add(dir)) < 6)
@@ -248,6 +253,7 @@ public class Landscaper extends Robot {
                     tryDeposit(current.directionTo(d));
                     return;
                 }
+                //finally pick the spot with the lowest elevation
                 else if (dump == null)
                     dump = d;
                 else if (rc.senseElevation(d) < rc.senseElevation(dump))
@@ -257,9 +263,13 @@ public class Landscaper extends Robot {
             if (dump != null && tryDeposit(current.directionTo(dump)))
                 return;
         }
+        //if we've made it this far and still haven't done anything, then just dig
         if (rc.isReady()) {
+            //gotta make sure we're digging in smart locations so we don't flood ourselves
+            //waterLevel[] is an array of turn counts for the first few water levels
             boolean floodDanger = false;
             int i = 0;
+            //determine flood levels and check adjacent squares for flood danger
             while (waterLevel[i] < rc.getRoundNum())
                 i++;
             if (rc.senseElevation(current) <= i) {
@@ -270,12 +280,14 @@ public class Landscaper extends Robot {
                     }
                 }
             }
+            //if we're in danger of flooding, dig somewhere safe, even if it's in a wall spot
             if (floodDanger) {
                 for (Direction dir : directions) {
                     if (rc.onTheMap(current.add(dir)) && rc.senseElevation(current.add(dir)) > i)
                         if (tryDig(dir))
                             return;
                 }
+            //otherwise just dig wherever
             } else {
                 for (MapLocation m : digSpots) {
                     if (rc.canSenseLocation(m) && rc.getLocation().isAdjacentTo(m) && tryDig(rc.getLocation().directionTo(m)))
@@ -285,6 +297,7 @@ public class Landscaper extends Robot {
         }
     }
 
+    //dump dirt
     public boolean tryDeposit(Direction dir) throws GameActionException{
         if (rc.isReady() && rc.canDepositDirt(dir)) {
             rc.depositDirt(dir);
@@ -293,6 +306,7 @@ public class Landscaper extends Robot {
         return false;
     }
 
+    //dig dirt
     public boolean tryDig(Direction dir) throws GameActionException{
         RobotInfo r = rc.senseRobotAtLocation(rc.getLocation().add(dir));
         if (r!= null && r.type == RobotType.MINER)
@@ -304,16 +318,13 @@ public class Landscaper extends Robot {
         return false;
     }
 
+    //secure the design school by building a small wall around it
     private void secureDS()throws GameActionException{
         if (!rc.isReady())
             return;
-        ArrayList<MapLocation> toRemove = new ArrayList<>();
+        HashSet<MapLocation> toRemove = new HashSet<>();
          if (rc.getDirtCarrying() > 0) {
-        //     System.out.println("Gonna try and dump");
-             for (int i =0; waterLevel[i] < rc.senseElevation(rc.getLocation()); i++){
-             }
-             for (MapLocation m : dsdumpSpots) {
-             //    System.out.println("Checking dsdumpspot " + m);
+             for (MapLocation m : dsDumpSpots) {
                  if (rc.canSenseLocation(m) && rc.senseElevation(m) - dsElevation < 3) {
                      if (rc.getLocation().isAdjacentTo(m) && tryDeposit(rc.getLocation().directionTo(m)))
                          return;
@@ -323,17 +334,16 @@ public class Landscaper extends Robot {
              }
          }
         else{
-         //   System.out.println("it's digging time");
             for (Direction dir : directions){
                 if(digSpots.contains(rc.getLocation().add(dir)))
                     if (tryDig(dir))
                         return;
             }
         }
-        dsdumpSpots.removeAll(toRemove);
-        if(!dsdumpSpots.isEmpty()) {
+        dsDumpSpots.removeAll(toRemove);
+        if(!dsDumpSpots.isEmpty()) {
             if (rc.getDirtCarrying() == 25) {
-                MapLocation m = closestLocation(dsdumpSpots.toArray(new MapLocation[0]));
+                MapLocation m = closestLocation(dsDumpSpots.toArray(new MapLocation[0]));
                 Direction dir = rc.getLocation().directionTo(m);
                 if (tryMove(dir))
                     return;

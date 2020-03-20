@@ -1,5 +1,0 @@
-Codes for reading from the block chain
-
-11111111 - team secret so we know the message is ours
-0 - Location of HQ
-1 - HQ is in danger of flooding

@@ -1,13 +1,13 @@
 package pdx_team_one;
 import battlecode.common.*;
-
 import java.util.ArrayDeque;
 import java.util.HashSet;
 
-public class HQ extends Robot{
+//HQ builds miners, shoots drones, and when HQ is destroyed, the game is lost
+public class HQ extends Building{
 
-    int numMiners = 0;
-    int maxMiners = 6;
+    private int numMiners = 0;
+    private int maxMiners;
     private boolean strategy;
     private boolean locationSent;
     private boolean[][] visited = new boolean[rc.getMapWidth()][rc.getMapHeight()];
@@ -15,13 +15,14 @@ public class HQ extends Robot{
     private HashSet<MapLocation> fcSpots = new HashSet<>();
     private HashSet<MapLocation> innerSpots;
     private HashSet<MapLocation> wallSpots;
+    private HashSet<MapLocation> outerSpots;
     int DSelevation = -100000;
     private ArrayDeque<Node> checkSpots = new ArrayDeque<>();
-    public boolean innerSpotsFilled;
-    public boolean wallSpotsFilled;
-    public Direction lastMinerBuilt = Direction.NORTHEAST;
+    private boolean innerSpotsFilled;
+    private boolean wallSpotsFilled;
 
-    class Node{
+    //this is used to determine optimal Design School location
+    private static class Node{
         int moves;
         MapLocation loc;
         int elevation;
@@ -32,14 +33,16 @@ public class HQ extends Robot{
         }
     }
 
+    //initializes map locations
     HQ(RobotController r) throws GameActionException{
         super(r);
         HQ = rc.getLocation();
         hqElevation = rc.senseElevation(rc.getLocation());
         visited[HQ.x][HQ.y] = true;
-        checkSpots.add(new Node(0,HQ));
+        checkSpots.add(new Node(0, HQ));
         innerSpots = initInnerSpots();
         wallSpots = initWallSpots();
+        outerSpots = initOuterSpots();
         int soup = 0;
 
         for (MapLocation m : rc.senseNearbySoup())
@@ -52,18 +55,22 @@ public class HQ extends Robot{
     }
 
     public void takeTurn() throws GameActionException {
+        //sends out where it's located to everyone
         if (!locationSent) {
             locationSent = sendLocation();
             MapLocation[] soups = rc.senseNearbySoup();
             broadcastSoup(soups);
         }
+        //shoot down any net guns;
         defense();
+        //build miners
         if (numMiners < maxMiners && rc.getTeamSoup() >= RobotType.MINER.cost)
             numMiners = buildMiners();
+        //search for design school location
         if (!checkSpots.isEmpty())
             BFS(checkSpots.remove());
+        //determine best design school location and send it out
         else if (!strategy && Clock.getBytecodesLeft() > 15000){
-            System.out.println("Starting with " + Clock.getBytecodesLeft());
             MapLocation[] corners = new MapLocation[4];
             corners[0] = new MapLocation(0,0);
             corners[1] = new MapLocation(0,rc.getMapHeight());
@@ -93,41 +100,30 @@ public class HQ extends Robot{
                         fc = m;
                 }
             }
-            if (fc != null) {
-                int[] msg = new int[7];
-                msg[0] = TEAM_ID;
-                msg[1] = DEFENSE;
-                msg[2] = fc.x;
-                msg[3] = fc.y;
-                msg[4] = ds.x;
-                msg[5] = ds.y;
-                sendMessage(msg, DEFCON5);
-                //System.out.println("DS: " + ds);
-            }
-            else{
-                //System.out.println("No suitable locations");
+            if (ds == null || fc == null){
                 ds = HQ.add(Direction.NORTH).add(Direction.NORTH).add(Direction.NORTH);
                 fc = HQ.add(Direction.NORTH).add(Direction.NORTH).add(Direction.NORTHEAST);
-                int[] msg = new int[7];
-                msg[0] = TEAM_ID;
-                msg[1] = DEFENSE;
-                msg[2] = fc.x;
-                msg[3] = fc.y;
-                msg[4] = ds.x;
-                msg[5] = ds.y;
-                sendMessage(msg, DEFCON5);
                 maxMiners = 6;
             }
+            int[] msg = new int[7];
+            msg[0] = TEAM_ID;
+            msg[1] = DEFENSE;
+            msg[2] = fc.x;
+            msg[3] = fc.y;
+            msg[4] = ds.x;
+            msg[5] = ds.y;
+            sendMessage(msg, DEFCON5);
             strategy = true;
-            //System.out.println("Ending with " + Clock.getBytecodesLeft());
         }
+        //check to see what phase we're on
         if(!innerSpotsFilled)
             checkInnerSpots();
         if (!wallSpotsFilled)
             checkWallSpots();
     }
 
-    public boolean sendLocation() throws GameActionException {
+    //send location
+    private boolean sendLocation() throws GameActionException {
         int [] message = new int[7];
         message[0] = TEAM_ID;
         message[1] = HQ_LOCATION;
@@ -138,34 +134,40 @@ public class HQ extends Robot{
         return sendMessage(message,DEFCON5);
     }
 
-    public int buildMiners() throws GameActionException {
-        lastMinerBuilt = randomDirection();
-        while(!tryBuild(RobotType.MINER,lastMinerBuilt)){
-            lastMinerBuilt = randomDirection();
+    //build a miner
+    private int buildMiners() throws GameActionException {
+        Direction dir = randomDirection();
+        while(!tryBuild(RobotType.MINER,dir)){
+            dir = randomDirection();
         }
         return ++numMiners;
     }
 
 
-    public boolean evaluate(MapLocation m)throws GameActionException {
+    //checks to see if m is a possibility for the design school. It must not interfere with the wall and have at least
+    //4 landing sports for landscapers
+    private boolean evaluate(MapLocation m)throws GameActionException {
         if (!rc.canSenseLocation(m))
             return false;
-        if (HQ.distanceSquaredTo(m) <= 13 || HQ.distanceSquaredTo(m) == 18)
+        if(m.distanceSquaredTo(HQ) <= 13 || outerSpots.contains(m) || wallSpots.contains(m) || innerSpots.contains(m))
             return false;
         int spots = 0;
         for (Direction dir : directions) {
             if (rc.canSenseLocation(m.add(dir))) {
                 if (rc.senseFlooding(m.add(dir)))
                     return false;
-                if (rc.senseElevation(m) - rc.senseElevation(m.add(dir)) <= 3 && rc.senseElevation(m.add(dir)) - rc.senseElevation(m) <= 3)
+                if (elevationDiff(m,m.add(dir)) <= 3)
                     spots++;
             }
         }
         return (spots >= 4);
     }
 
-    public void BFS(Node m) throws GameActionException{
+    //a recursive breadth-first search to determine the optimal location for the design school
+    private void BFS(Node m) throws GameActionException{
+        //if the spot is close enough for miners to easily get to
         if (m.moves <= 6) {
+            //if it passes the evaluation, then we only want to spots that are the highest elevations
             if (evaluate(m.loc)) {
                 if (m.elevation == DSelevation)
                     dsSpots.add(m.loc);
@@ -177,6 +179,7 @@ public class HQ extends Robot{
                     DSelevation = m.elevation;
                 }
             }
+            //add the surrounding spots to the BFS if we haven't already checked them
             for (Direction dir : directions) {
                 MapLocation check = m.loc.add(dir);
                 if (rc.onTheMap(check) && rc.canSenseLocation(check) && !visited[check.x][check.y]) {
@@ -187,17 +190,18 @@ public class HQ extends Robot{
                 }
             }
         }
+        //if we have enough time, keep chugging along
         if (!checkSpots.isEmpty() && Clock.getBytecodesLeft() > 2000)
             BFS(checkSpots.remove());
     }
 
-    public void checkInnerSpots() throws GameActionException {
+    //see if landscapers have filled the inner spots and let everyone know
+    private void checkInnerSpots() throws GameActionException {
         for (MapLocation m : innerSpots) {
             RobotInfo r = rc.senseRobotAtLocation(m);
             if (r == null || r.type != RobotType.LANDSCAPER)
                 return;
         }
-        // System.out.println("Inner Spots filled");
         int[] msg = new int[7];
         msg[0] = TEAM_ID;
         msg[1] = INNER_SPOTS_FILLED;
@@ -205,13 +209,13 @@ public class HQ extends Robot{
             innerSpotsFilled = true;
     }
 
-    public void checkWallSpots() throws GameActionException {
+    //see if landscapers have filled the wall spots and let everyone know
+    private void checkWallSpots() throws GameActionException {
         for (MapLocation m : wallSpots) {
             RobotInfo r = rc.senseRobotAtLocation(m);
             if (r == null || r.type != RobotType.LANDSCAPER)
                 return;
         }
-        System.out.println("Wall Spots filled");
         int[] msg = new int[7];
         msg[0] = TEAM_ID;
         msg[1] = WALL_SPOTS_FILLED;

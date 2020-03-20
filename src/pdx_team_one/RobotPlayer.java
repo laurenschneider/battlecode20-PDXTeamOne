@@ -51,7 +51,6 @@ public strictfp class RobotPlayer {
             }
 
         } catch (Exception e) {
-            //System.out.println(rc.getType() + " Exception");
             e.printStackTrace();
         }
 
@@ -61,7 +60,6 @@ public strictfp class RobotPlayer {
                     bot.takeTurn();
                 Clock.yield();
             } catch (Exception e) {
-                //System.out.println(rc.getType() + " Exception");
                 e.printStackTrace();
             }
         }

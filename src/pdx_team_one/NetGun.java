@@ -1,7 +1,8 @@
 package pdx_team_one;
 import battlecode.common.*;
 
-public class NetGun extends Robot{
+//the net gun just shoots down enemy drones
+public class NetGun extends Building{
     NetGun(RobotController r) {
         super(r);
     }

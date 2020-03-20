@@ -1,24 +1,25 @@
 package pdx_team_one;
 import battlecode.common.*;
 
+//this is the scaffolding code that came with BattleCode
 public strictfp class RobotPlayer {
 
     /**
      * run() is the method that is called when a robot is instantiated in the Battlecode world.
      * If this method returns, the robot dies!
      **/
-    @SuppressWarnings("unused")
-    public static void run(RobotController rc) throws GameActionException {
+    @SuppressWarnings({"InfiniteLoopStatement", "unused"})
+    public static void run(RobotController rc){
 
         // This is the RobotController object. You use it to perform actions from this robot,
         // and to get information on its current status.
 
         Robot bot = null;
 
-        System.out.println("I'm a " + rc.getType() + " and I just got created!");
+        //System.out.println("I'm a " + rc.getType() + " and I just got created!");
         // Try/catch blocks stop unhandled exceptions, which cause your robot to explode
         try {
-            System.out.println("I'm a " + rc.getType() + "! Location " + rc.getLocation());
+            //System.out.println("I'm a " + rc.getType() + "! Location " + rc.getLocation());
             switch (rc.getType()) {
                 case HQ:
                     bot = new HQ(rc);
@@ -50,16 +51,15 @@ public strictfp class RobotPlayer {
             }
 
         } catch (Exception e) {
-            System.out.println(rc.getType() + " Exception");
             e.printStackTrace();
         }
 
         while (true) {
             try {
-                bot.takeTurn();
+                if (bot != null)
+                    bot.takeTurn();
                 Clock.yield();
             } catch (Exception e) {
-                System.out.println(rc.getType() + " Exception");
                 e.printStackTrace();
             }
         }

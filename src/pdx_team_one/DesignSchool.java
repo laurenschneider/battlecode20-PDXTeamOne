@@ -1,12 +1,13 @@
 package pdx_team_one;
 import battlecode.common.*;
-
 import java.util.HashSet;
 
-public class DesignSchool extends Robot{
-    int numLS = 0;
-    int maxLS = 1;
+//the Design School is a building that builds landscapers
+public class DesignSchool extends Building{
+    private int numLS = 0;
+    private int maxLS = 1;
     private boolean droneHomeLocationSent;
+
     DesignSchool(RobotController r) throws GameActionException{
         super(r);
         for (; lastBlockRead < rc.getRoundNum(); lastBlockRead++)
@@ -16,6 +17,7 @@ public class DesignSchool extends Robot{
     public void takeTurn() throws GameActionException{
         for (; lastBlockRead < rc.getRoundNum(); lastBlockRead++)
             parseBlockchain(lastBlockRead);
+        //the following logic determines whether or not to build a landscaper
         if (numLS < maxLS && rc.getTeamSoup() >= RobotType.REFINERY.cost + 5)
             buildLS();
         else if (numLS < 4 && rc.getTeamSoup() >= RobotType.VAPORATOR.cost + 5)
@@ -26,34 +28,44 @@ public class DesignSchool extends Robot{
             droneHomeLocationSent = sendDroneHomeLocation();
     }
 
-    int buildLS() throws GameActionException{
+    //build a landscaper
+    private void buildLS() throws GameActionException{
         for (Direction dir : corners) {
-            if (tryBuild(RobotType.LANDSCAPER, dir))
-                return ++numLS;
-        }
-        for (Direction dir : Direction.cardinalDirections()){
-            if (tryBuild(RobotType.LANDSCAPER, dir))
-                return ++numLS;
-        }
-        return numLS;
-    }
-
-    public int parseBlockchain(int round) throws GameActionException {
-        int res = 0;
-        for (Transaction t : rc.getBlock(round)) {
-            if (t.getMessage()[0] == TEAM_ID) {
-                if (t.getMessage()[1] == DEFENSE)
-                    maxLS = 1;
-                else if (t.getMessage()[1] == START_PHASE_2)
-                    maxLS = 10000;
-                else if (t.getMessage()[1] == VAPORATOR_BUILT)
-                    maxLS = t.getMessage()[2];
+            if (tryBuild(RobotType.LANDSCAPER, dir)) {
+                ++numLS;
+                return;
             }
         }
-        return res;
+        for (Direction dir : Direction.cardinalDirections()){
+            if (tryBuild(RobotType.LANDSCAPER, dir)) {
+                ++numLS;
+                return;
+            }
+        }
     }
 
-    public boolean sendDroneHomeLocation() throws GameActionException{
+    //get the latest hot goss
+    private void parseBlockchain(int round) throws GameActionException {
+        for (Transaction t : rc.getBlock(round)) {
+            if (t.getMessage()[0] == TEAM_ID) {
+                switch (t.getMessage()[1]) {
+                    case START_PHASE_2:
+                        maxLS = 10000;
+                        break;
+                    case VAPORATOR_BUILT:
+                        maxLS = t.getMessage()[2];
+                        break;
+                    case HQ_LOCATION:
+                        HQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
+                        break;
+                }
+            }
+        }
+    }
+
+    //finds the best spot for drones to call home and sends it out. It picks the spot based on the lowest pollution
+    //followed by furthest away from HQ to prevent collisions with landscapers
+    private boolean sendDroneHomeLocation() throws GameActionException{
         HashSet<MapLocation> homes = new HashSet<>();
         int pollution = 100000;
         for (Direction dir : directions) {
@@ -78,18 +90,21 @@ public class DesignSchool extends Robot{
                     homes.add(m);
             }
         }
-        MapLocation ret = null;
-        for (MapLocation m : homes){
-            if (ret == null)
-                ret = m;
-            else if (HQ.distanceSquaredTo(m) > HQ.distanceSquaredTo(ret))
-                ret = m;
+        if (!homes.isEmpty()) {
+            MapLocation ret = null;
+            for (MapLocation m : homes) {
+                if (ret == null)
+                    ret = m;
+                else if (HQ.distanceSquaredTo(m) > HQ.distanceSquaredTo(ret))
+                    ret = m;
+            }
+            int[] msg = new int[7];
+            msg[0] = TEAM_ID;
+            msg[1] = DRONE_HOME;
+            msg[2] = ret.x;
+            msg[3] = ret.y;
+            return sendMessage(msg, DEFCON5);
         }
-        int [] msg = new int[7];
-        msg[0] = TEAM_ID;
-        msg[1] = DRONE_HOME;
-        msg[2] = ret.x;
-        msg[3] = ret.y;
-        return sendMessage(msg,DEFCON5);
+        return false;
     }
 }

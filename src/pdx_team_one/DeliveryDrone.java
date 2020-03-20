@@ -1,12 +1,11 @@
 package pdx_team_one;
 import battlecode.common.*;
-
-import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 
-public class DeliveryDrone extends Robot{
+
+//Delivery drones pickup units and deliver them to locations
+public class DeliveryDrone extends Unit{
 
     private HashMap<Integer, MapLocation> friends = new HashMap<>();
     private HashSet<MapLocation> water = new HashSet<>();
@@ -17,20 +16,21 @@ public class DeliveryDrone extends Robot{
     private boolean innerSpotsFilled;
     private boolean wallSpotsFilled;
     private HashSet<MapLocation> innerSpots = new HashSet<>();
-    private HashSet<MapLocation> initialInnerSpots = new HashSet<>();
+    private HashSet<MapLocation> initialInnerSpots;
     private HashSet<MapLocation> wallSpots = new HashSet<>();
-    private HashSet<MapLocation> initialWallSpots = new HashSet<>();
+    private HashSet<MapLocation> initialWallSpots;
     private HashSet<MapLocation> outerSpots;
     private HashSet<MapLocation> initialOuterSpots = new HashSet<>();
-    private ArrayList<MapLocation> blockSoups = new ArrayList<>();
+    private HashSet<MapLocation> blockSoups = new HashSet<>();
     private MapLocation builderDropoff = null;
     private MapLocation ds = null, fc = null;
     private int builderID = -1;
     private MapLocation builderPickup = null;
     private boolean cowSearch;
-    int turnsHeld;
-    int turnsStuck = 0;
+    private int turnsHeld;
+    private int turnsStuck = 0;
 
+    //initializes basic map data and updated game state information
     DeliveryDrone(RobotController r) throws GameActionException {
         super(r);
         for (; lastBlockRead < rc.getRoundNum(); lastBlockRead++)
@@ -65,9 +65,15 @@ public class DeliveryDrone extends Robot{
     }
 
     public void takeTurn() throws GameActionException {
+        //get the latest blockChain info
         for (; lastBlockRead < rc.getRoundNum(); lastBlockRead++)
             parseBlockchain(lastBlockRead);
-        if (innerSpots.contains(rc.getLocation()) || wallSpots.contains(rc.getLocation()) || wallSpots.contains(rc.getLocation())){
+        //home is where the drones hang out when not doing anything. That initializes to being near the Design School
+        //but if the Design School is destroyed, then we switch to HQ
+        if(rc.canSenseLocation(ds) && (rc.senseRobotAtLocation(ds) == null || rc.senseRobotAtLocation(ds).type != RobotType.DESIGN_SCHOOL))
+            home = HQ;
+        //if we're impeding the wall progress, we need to either get out of the way or self-destruct
+        if (!home.equals(HQ) && (innerSpots.contains(rc.getLocation()) || wallSpots.contains(rc.getLocation()) || wallSpots.contains(rc.getLocation()))){
             turnsStuck++;
             if (turnsStuck >= 25)
                 scout();
@@ -76,9 +82,9 @@ public class DeliveryDrone extends Robot{
         }
         else
             turnsStuck = 0;
+        //decide what to do based on if we're holding someone or not
         if (rc.isReady()) {
             if (rc.isCurrentlyHoldingUnit()) {
-                //System.out.println("I am holding a unit!");
                 if (holding.team == rc.getTeam())
                     deliverFriend();
                 else
@@ -88,63 +94,66 @@ public class DeliveryDrone extends Robot{
                 findSomethingToDo();
             }
         }
+        if (Clock.getBytecodesLeft() > 2000)
+            scan();
         if (rc.isReady())
             scout();
     }
 
-    boolean deliverLS(HashSet<MapLocation> spots) throws GameActionException{
-        ArrayDeque<MapLocation> toRemove = new ArrayDeque<>();
+    //this function tells the drone to deliver a Landscaper to one of the locations in spots
+    private boolean deliverLS(HashSet<MapLocation> spots) throws GameActionException{
+        HashSet<MapLocation> toRemove = new HashSet<>();
         MapLocation target = null;
         for (MapLocation m : spots) {
-           // System.out.println("Maybe my friend wants to go to " + m);
             if (rc.canSenseLocation(m)) {
+                //if there's a landscaper already in m and/or it's flooded beyond repair, remove it from the list
                 RobotInfo r = rc.senseRobotAtLocation(m);
                 if (r != null && r.type == RobotType.LANDSCAPER)
                     toRemove.add(m);
                 else if (rc.senseFlooding(m) && rc.senseElevation(m) < -1000)
                     toRemove.add(m);
-                else if (rc.senseFlooding(m))
-                    continue;
-                else if (target == null)
-                    target = m;
-                else if (rc.senseElevation(m) < rc.senseElevation(target))
-                    target = m;
+                //otherwise, pick the closest spot
+                else if (!rc.senseFlooding(m)) {
+                    if (target == null)
+                        target = m;
+                    else if (rc.senseElevation(m) < rc.senseElevation(target))
+                        target = m;
+                }
             }
         }
         spots.removeAll(toRemove);
+        //if we have a valid target, either drop our landscaper off or move towards it
         if (target != null){
             if (rc.getLocation().equals(target)){
                 for (Direction dir : directions)
                     tryMove(dir);
             }
             else if (rc.getLocation().isAdjacentTo(target) && rc.canDropUnit(rc.getLocation().directionTo(target))) {
-                //System.out.println("Dropping him off at " + target);
                 rc.dropUnit(rc.getLocation().directionTo(target));
                 spots.remove(target);
                 holding = null;
                 return true;
             }
-            else {
-               // System.out.println("Before: " + Clock.getBytecodesLeft());
+            else
                 pathTo(target);
-                //System.out.println("After:  " + Clock.getBytecodesLeft());
-            }
         }
+        //or if there are still spots available, then head towards the closest one
         else if (!spots.isEmpty()) {
             target = closestLocation(spots.toArray(new MapLocation[0]));
             if (rc.getLocation().isAdjacentTo(target)){
                 for (Direction dir : directions)
                     tryMove(dir);
             }
-            //System.out.println("Carrying friend to " + target);
-            //System.out.println(Clock.getBytecodesLeft() + "  " + rc.isReady());
             pathTo(target);
             return true;
         }
+        //return whether or not there are available spots
         return (!spots.isEmpty());
     }
 
-    int deliverFriend() throws GameActionException {
+    //this block tells the drone how to deliver a friend
+    private void deliverFriend() throws GameActionException {
+        //if we've held a friend for too long, just drop him
         if (holding.ID != builderID)
             turnsHeld++;
         if (turnsHeld >= 50) {
@@ -155,10 +164,11 @@ public class DeliveryDrone extends Robot{
                 }
             }
         }
+        //if there's too much pollution, the senseLocation() function won't work so we need to get out of there
         if (rc.sensePollution(rc.getLocation()) > 5000)
             scout();
+        //the builder tells the drone where he needs to go, so the drone goes there
         else if (holding.ID == builderID && builderDropoff != null) {
-            //System.out.println("Build needs to move to " + builderDropoff);
             if (rc.getLocation().equals(builderDropoff)) {
                 for (Direction dir : directions)
                     tryMove(dir);
@@ -167,25 +177,41 @@ public class DeliveryDrone extends Robot{
                     rc.dropUnit(rc.getLocation().directionTo(builderDropoff));
                     builderID = -1;
                     builderDropoff = null;
-                    return 112;
-                }
-                else if (rc.senseRobotAtLocation(builderDropoff) != null){
-                    for (Direction dir: directions){
-                        if (rc.canDropUnit(dir) && rc.getLocation().add(dir).isAdjacentTo(builderDropoff))
+                } else if (rc.senseRobotAtLocation(builderDropoff) != null) {
+                    for (Direction dir : directions) {
+                        if (rc.canDropUnit(dir) && rc.getLocation().add(dir).isAdjacentTo(builderDropoff)) {
                             rc.dropUnit(dir);
+                            builderID = -1;
+                            builderDropoff = null;
+                            return;
+                        }
+                        return;
                     }
-                    return 456;
                 }
-            } else
+            } else if (builderDropoff.equals(ds)) {
+                if (rc.getLocation().add(rc.getLocation().directionTo(ds)).isAdjacentTo(ds)) {
+                    for (Direction dir : directions) {
+                        if (rc.onTheMap(rc.getLocation().add(dir)) && rc.getLocation().add(dir).isAdjacentTo(ds) && rc.canDropUnit(dir) && elevationDiff(rc.getLocation().add(dir),ds) <= 3) {
+                            rc.dropUnit(dir);
+                            builderID = -1;
+                            builderDropoff = null;
+                            return;
+                        }
+                    }
+                }
+                pathTo(ds);
+            } else {
                 pathTo(builderDropoff);
+            }
+        //landscapers go to landscaper spots
         } else if (holding.type == RobotType.LANDSCAPER) {
             if (!innerSpots.isEmpty() && deliverLS(innerSpots))
-                return 0;
+                return;
             if (!wallSpots.isEmpty() && deliverLS(wallSpots))
-                return 1;
-            if (!outerSpots.isEmpty() && deliverLS(outerSpots))
-                return 2;
-            return 3;
+                return;
+            if (!outerSpots.isEmpty())
+                deliverLS(outerSpots);
+        //and other miners just go to soup
         } else {
             MapLocation target = null;
             for (MapLocation soup : rc.senseNearbySoup()) {
@@ -196,20 +222,6 @@ public class DeliveryDrone extends Robot{
                 else
                     target = closestLocation(new MapLocation[]{target,soup});
             }
-            /*
-            if (target == null && !blockSoups.isEmpty()) {
-                ArrayList<MapLocation> toRemove = new ArrayList<>();
-                for (MapLocation soup : blockSoups){
-                    if (rc.canSenseLocation(soup))
-                        toRemove.add(soup);
-                    else if (target == null)
-                    target = soup;
-                    else
-                        target = closestLocation(new MapLocation[]{target,soup});
-                }
-                blockSoups.removeAll(toRemove);
-            }*/
-
             if (target == null) {
                 if (blockSoups.isEmpty())
                     scout();
@@ -219,13 +231,10 @@ public class DeliveryDrone extends Robot{
                         blockSoups.remove(target);
                         if (blockSoups.isEmpty()){
                             scout();
-                            return 134;
+                            return;
                         }
                     }
-                   // System.out.println("Soup out of range. Taking my buddy to " + target + " with " + Clock.getBytecodesLeft());
                     pathTo(closestLocation(blockSoups.toArray(new MapLocation[0])));
-                  //  System.out.println("Ending with " + Clock.getBytecodesLeft());
-
                 }
             }
             else if (rc.getLocation().isAdjacentTo(target)){
@@ -240,114 +249,95 @@ public class DeliveryDrone extends Robot{
                     }
                 }
             }
-            else {
-               // System.out.println("Soup in range. Taking my buddy to " + target + " with " + Clock.getBytecodesLeft());
+            else
                 pathTo(target);
-                //System.out.println("Ending with " + Clock.getBytecodesLeft());
-            }
-            return 5;
         }
-        return 999;
     }
 
-    public void parseBlockchain(int i) throws GameActionException {
+    //gets all the latest hot goss
+    private void parseBlockchain(int i) throws GameActionException {
         for (Transaction t : rc.getBlock(i)) {
             if (t.getMessage()[0] == TEAM_ID) {
-                if (t.getMessage()[1] == HQ_LOCATION) {
-                    HQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
-                    hqID = t.getMessage()[4];
-                    hqElevation = t.getMessage()[5];
-                } else if (t.getMessage()[1] == ENEMY_HQ_FOUND) {
-                    enemyHQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
-                    enemyHQID = t.getMessage()[4];
-                } else if (t.getMessage()[1] == ENEMY_NG_FOUND) {
-                    enemyNG = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
-                } else if (t.getMessage()[1] == NEED_DELIVERY) {
-                    if (t.getMessage()[2] != -1) {
-                        builderID = t.getMessage()[4];
-                        builderPickup = new MapLocation(t.getMessage()[5], t.getMessage()[6]);
-                        builderDropoff = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
-                    } else {
-                        friends.put(t.getMessage()[4], new MapLocation(t.getMessage()[5], t.getMessage()[6]));
-                       // System.out.println("Incoming message! Friend " + t.getMessage()[4] + " is located at " + friends.get(t.getMessage()[4]));
-                    }
-                } else if (t.getMessage()[1] == DS_SECURE) {
-                    ds_secure = true;
-                } else if (t.getMessage()[1] == DEFENSE) {
-                    ds = new MapLocation(t.getMessage()[4], t.getMessage()[5]);
-                    fc = new MapLocation(t.getMessage()[2],t.getMessage()[3]);
-                    for (Direction dir : directions) {
-                        if (rc.onTheMap(ds.add(dir).add(dir))) {
-                            home = ds.add(dir).add(dir);
-                            break;
+                switch (t.getMessage()[1]) {
+                    case HQ_LOCATION:
+                        HQ = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
+                        hqElevation = t.getMessage()[5];
+                        break;
+                    case NEED_DELIVERY:
+                        if (t.getMessage()[2] != -1) {
+                            builderID = t.getMessage()[4];
+                            builderPickup = new MapLocation(t.getMessage()[5], t.getMessage()[6]);
+                            builderDropoff = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
+                        } else
+                            friends.put(t.getMessage()[4], new MapLocation(t.getMessage()[5], t.getMessage()[6]));
+                        break;
+                    case DS_SECURE:
+                        ds_secure = true;
+                        break;
+                    case DEFENSE:
+                        ds = new MapLocation(t.getMessage()[4], t.getMessage()[5]);
+                        fc = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
+                        for (Direction dir : directions) {
+                            if (rc.onTheMap(ds.add(dir).add(dir))) {
+                                home = ds.add(dir).add(dir);
+                                break;
+                            }
                         }
-                    }
-                } else if (t.getMessage()[1] == SOUPS_FOUND) {
-                    for (int j = 2; j < 7 && t.getMessage()[j] != 0; j++)
-                        blockSoups.add(new MapLocation(t.getMessage()[j] / 100, t.getMessage()[j] % 100));
-                } else if (t.getMessage()[1] == INNER_SPOTS_FILLED) {
-                    innerSpotsFilled = true;
-                    innerSpots.clear();
-                    cowSearch = true;
-                } else if (t.getMessage()[1] == WALL_SPOTS_FILLED) {
-                    wallSpotsFilled = true;
-                    wallSpots.clear();
-                } else if (t.getMessage()[1] == DRONE_HOME) {
-                    home = new MapLocation(t.getMessage()[2],t.getMessage()[3]);
+                        break;
+                    case SOUPS_FOUND:
+                        for (int j = 2; j < 7 && t.getMessage()[j] != 0; j++)
+                            blockSoups.add(new MapLocation(t.getMessage()[j] / 100, t.getMessage()[j] % 100));
+                        break;
+                    case INNER_SPOTS_FILLED:
+                        innerSpotsFilled = true;
+                        innerSpots.clear();
+                        cowSearch = true;
+                        break;
+                    case WALL_SPOTS_FILLED:
+                        wallSpotsFilled = true;
+                        wallSpots.clear();
+                        break;
+                    case DRONE_HOME:
+                        home = new MapLocation(t.getMessage()[2], t.getMessage()[3]);
+                        break;
                 }
             }
         }
     }
 
-    public int pickupUnit(MapLocation ml)throws GameActionException {
-     //   System.out.println("Gonna go pick up a bot at " + ml);
+    //either picks up the unit at ml or moves toward it
+    private void pickupUnit(MapLocation ml)throws GameActionException {
         if (rc.canSenseLocation(ml)) {
             RobotInfo r = rc.senseRobotAtLocation(ml);
-            if (rc.getLocation().isAdjacentTo(ml) && rc.canPickUpUnit(r.ID)) {
-              //  System.out.println("Picking up " + r.ID);
+            if (r != null && rc.getLocation().isAdjacentTo(ml) && rc.canPickUpUnit(r.ID)) {
                 holding = r;
                 rc.pickUpUnit(r.ID);
-                if (friends.containsKey(r.ID))
-                    friends.remove(r.ID);
-                return 1;
+                friends.remove(r.ID);
+                return;
             }
         }
         pathTo(ml);
-        return 0;
     }
 
-    public MapLocation nearestEnemy() throws GameActionException{
+    //finds the nearest enemy
+    private MapLocation nearestEnemy(){
+        //but only after we've filled our inner spots with landscapers
         if(!innerSpotsFilled)
             return null;
-      //  System.out.println("Checking for enemies");
+        MapLocation target = null;
         for (RobotInfo r : rc.senseNearbyRobots(-1,rc.getTeam().opponent())) {
-            if (enemyNG == null && r.type == RobotType.NET_GUN ) {
-                enemyNG = r.location;
-                int[] msg = new int[7];
-                msg[0] = TEAM_ID;
-                msg[1] = ENEMY_NG_FOUND;
-                msg[2] = enemyNG.x;
-                msg[3] = enemyNG.y;
-                msg[4] = r.ID;
-                sendMessage(msg, DEFCON1);
-            } else if (enemyHQ == null && r.type == RobotType.HQ) {
-                enemyHQ = r.location;
-                int[] msg = new int[7];
-                msg[0] = TEAM_ID;
-                msg[1] = ENEMY_HQ_FOUND;
-                msg[2] = enemyHQ.x;
-                msg[3] = enemyHQ.y;
-                msg[4] = r.ID;
-                sendMessage(msg, DEFCON1);
+            if (r.type == RobotType.LANDSCAPER || r.type == RobotType.MINER){
+                if (target == null)
+                    target = r.location;
+                else if (HQ.distanceSquaredTo(r.location) < HQ.distanceSquaredTo(target))
+                    target = r.location;
             }
-            else if (r.type == RobotType.LANDSCAPER || r.type == RobotType.MINER)
-                return r.location;
         }
-        return null;
+        return target;
     }
 
-    public MapLocation nearestFriendInNeed(){
-       // System.out.println("Checking for friends");
+    //find the nearest landscaper/miner that needs to move
+    private MapLocation nearestFriendInNeed(){
         MapLocation target = null;
         for (RobotInfo r : rc.senseNearbyRobots(-1,rc.getTeam())) {
             if (friends.containsKey(r.ID)) {
@@ -362,7 +352,6 @@ public class DeliveryDrone extends Robot{
             } else if (ds_secure && r.type == RobotType.LANDSCAPER) {
                 if (!innerSpots.isEmpty()){
                     if (!initialInnerSpots.contains(r.location)) {
-                       // System.out.println("The bot at " + r.location + " needs to be picked up");
                         if (target == null)
                             target = r.location;
                         else
@@ -371,7 +360,6 @@ public class DeliveryDrone extends Robot{
                 }
                 else if (!wallSpots.isEmpty()) {
                     if (!initialInnerSpots.contains(r.location) && !initialWallSpots.contains(r.location)) {
-                        System.out.println("The bot at " + r.location + " needs to be picked up");
                         if (target == null)
                             target = r.location;
                         else
@@ -380,7 +368,6 @@ public class DeliveryDrone extends Robot{
                 }
                 else if (!outerSpots.isEmpty()) {
                     if (!initialInnerSpots.contains(r.location) && !initialWallSpots.contains(r.location) && !initialOuterSpots.contains(r.location)) {
-                      //  System.out.println("The bot at " + r.location + " needs to be picked up");
                         if (target == null)
                             target = r.location;
                         else
@@ -392,41 +379,47 @@ public class DeliveryDrone extends Robot{
         return target;
     }
 
+    //findACow finds a cow
     public MapLocation findACow(){
+        //but only if we've taken care of other things first
         if(!cowSearch)
             return null;
-       // System.out.println("Checking for cows");
-        ArrayList <MapLocation> cow = new ArrayList<>();
-        for (RobotInfo r : rc.senseNearbyRobots(-1,Team.NEUTRAL)){
+        HashSet <MapLocation> cow = new HashSet<>();
+        for (RobotInfo r : rc.senseNearbyRobots(-1,Team.NEUTRAL))
             cow.add(r.location);
-        }
         if (cow.isEmpty())
             return null;
         return closestLocation(cow.toArray(new MapLocation[0]));
     }
 
-    public int findSomethingToDo() throws GameActionException {
+    //if we're not holding anybody
+    private void findSomethingToDo() throws GameActionException {
+        //see if the builder needs help
         if (builderID != -1){
             if(rc.canSenseLocation(builderPickup)) {
                 RobotInfo r = rc.senseRobotAtLocation(builderPickup);
                 if (r == null || r.ID != builderID)
                     builderID = -1;
                 else
-                    return pickupUnit(builderPickup);
+                    pickupUnit(builderPickup);
             }
             else
                 pathTo(builderPickup);
         }
 
-        MapLocation target = nearestEnemy();
+        //try to find a friend, then enemy, then cow
+        MapLocation target = nearestFriendInNeed();
         if (target == null)
-            target = nearestFriendInNeed();
+            target = nearestEnemy();
         if (target == null)
             target = findACow();
-        if (target != null)
-            return pickupUnit(target);
+        if (target != null) {
+            pickupUnit(target);
+            return;
+        }
+        //if nothing, check the friends log from the blockchain and move to the closest one if available
         if (!friends.isEmpty()) {
-            HashSet<Integer> toRemove = new HashSet();
+            HashSet<Integer> toRemove = new HashSet<>();
             for (int key : friends.keySet()) {
                 if (rc.canSenseLocation(friends.get(key)))
                     toRemove.add(key);
@@ -435,29 +428,30 @@ public class DeliveryDrone extends Robot{
                 friends.remove(key);
             if (!friends.isEmpty()) {
                 pathTo(closestLocation(friends.values().toArray(new MapLocation[0])));
-                return 253452345;
+                return;
             }
         }
-        /*if (rc.getLocation().distanceSquaredTo(home) < 10)
-            scout();
-        else*/
+        //we don't want the drones to just sit in one spot in case they're blocking anything
         if (rc.getLocation().equals(home))
             scout();
+        //but otherwise head home
         else
             pathTo(home);
-        return 666;
     }
 
-    public int scout() throws GameActionException{
+    //drones move in a pre-determined direction
+    private void scout() throws GameActionException{
+        //if the drone senses enemy netgun/HQ, then move out of the way
         for (RobotInfo r: rc.senseNearbyRobots(-1,rc.getTeam().opponent())) {
             if (r.type == RobotType.NET_GUN || r.type == RobotType.HQ){
                 path = rc.getLocation().directionTo(r.location).opposite();
                 tryMove(path);
                 tryMove(path.rotateRight());
                 tryMove(path.rotateLeft());
-                return 4235;
+                return;
             }
         }
+        //if there's too much pollution, we need to get out of there too
         if (rc.sensePollution(rc.getLocation()) > 5000){
             Direction d = null;
             for (Direction dir : directions){
@@ -467,14 +461,15 @@ public class DeliveryDrone extends Robot{
             }
             tryMove(d);
         }
+        //if all else fails, move in a random direction
         else {
-            while (!tryMove(path))
+            while (rc.isReady() && !tryMove(path))
                 path = randomDirection();
         }
-        return 0;
     }
 
-    public int destroyEnemy() throws GameActionException{
+    //if we're holding an enemy, find the nearest source of water and drop him off in it
+    private void destroyEnemy() throws GameActionException{
         MapLocation m;
         for (Direction dir : directions) {
             m = rc.getLocation().add(dir);
@@ -483,7 +478,7 @@ public class DeliveryDrone extends Robot{
                 if (rc.canDropUnit(dir)) {
                     rc.dropUnit(dir);
                     holding = null;
-                    return 0;
+                    return;
                 }
             }
         }
@@ -492,13 +487,13 @@ public class DeliveryDrone extends Robot{
             if (rc.canSenseLocation(m) && rc.senseFlooding(m)) {
                 water.add(m);
                 pathTo(rc.getLocation().add(dir).add(dir));
-                return 1;
+                return;
             }
             m = rc.getLocation().add(dir).add(dir).add(dir.rotateRight());
             if (rc.canSenseLocation(m) && rc.senseFlooding(m)) {
                 water.add(m);
                 pathTo(m);
-                return 1;
+                return;
             }
         }
         for (Direction dir : directions) {
@@ -506,25 +501,44 @@ public class DeliveryDrone extends Robot{
             if (rc.canSenseLocation(m) && rc.senseFlooding(m)) {
                 water.add(m);
                 pathTo(m);
-                return 2;
+                return;
             }
             m = rc.getLocation().add(dir).add(dir).add(dir.rotateLeft());
             if (rc.canSenseLocation(m) && rc.senseFlooding(m)) {
                 water.add(m);
                 pathTo(m);
-                return 2;
+                return;
             }
             m = rc.getLocation().add(dir).add(dir).add(dir.rotateRight());
             if (rc.canSenseLocation(m) && rc.senseFlooding(m)) {
                 water.add(m);
                 pathTo(m);
-                return 2;
+                return;
             }
         }
         if (water.isEmpty())
             scout();
         else
             pathTo(closestLocation(water.toArray(new MapLocation[0])));
-        return 3;
     }
+
+    //update maps by checking local surroundings
+    private void scan() throws GameActionException{
+        MapLocation current = rc.getLocation();
+        for (Direction dir : directions){
+            MapLocation check = current.add(dir);
+            if (rc.onTheMap(check)){
+                RobotInfo r  = rc.senseRobotAtLocation(check);
+                if (rc.senseFlooding(check))
+                    water.add(check);
+                else if (r == null && initialInnerSpots.contains(check))
+                    innerSpots.add(check);
+                else if (r == null && initialWallSpots.contains(check))
+                    wallSpots.add(check);
+                else if (r == null && initialOuterSpots.contains(check))
+                    outerSpots.add(check);
+            }
+        }
+    }
+
 }

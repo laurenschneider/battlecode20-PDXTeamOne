@@ -1,9 +1,10 @@
 package pdx_team_one;
 import battlecode.common.*;
 
-public class Vaporator extends Robot{
+//vaporators create soup and help pollution automatically. There's nothing to see here
+public class Vaporator extends Building{
     Vaporator(RobotController r) {
         super(r);
     }
-    public void takeTurn() throws GameActionException{}
+    public void takeTurn(){}
 }
